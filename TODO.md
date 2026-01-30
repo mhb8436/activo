@@ -81,13 +81,13 @@ activo-code
 
 ---
 
-## Phase 0: 프로젝트 셋업
+## Phase 0: 프로젝트 셋업 ✅
 
 ### 0.1 프로젝트 초기화
-- [ ] continue-cli 구조 기반 프로젝트 생성
-- [ ] package.json 설정
-- [ ] TypeScript 설정 (tsconfig.json)
-- [ ] 필수 의존성만 설치
+- [x] continue-cli 구조 기반 프로젝트 생성
+- [x] package.json 설정
+- [x] TypeScript 설정 (tsconfig.json)
+- [x] 필수 의존성만 설치
 
 **테스트:**
 ```bash
@@ -129,12 +129,12 @@ activo-code/
 
 ---
 
-## Phase 1: 기본 CLI + Ollama 연동
+## Phase 1: 기본 CLI + Ollama 연동 ✅
 
 ### 1.1 CLI 프레임워크
-- [ ] Commander.js 기반 CLI 엔트리 생성
-- [ ] --version, --help 옵션
-- [ ] config 명령어 (설정 확인/수정)
+- [x] Commander.js 기반 CLI 엔트리 생성
+- [x] --version, --help 옵션
+- [x] config 명령어 (설정 확인/수정)
 
 **테스트:**
 ```bash
@@ -144,10 +144,10 @@ activo config             # 현재 설정
 ```
 
 ### 1.2 Ollama 클라이언트
-- [ ] continue-cli의 Ollama.ts 참조하여 구현
-- [ ] 연결 테스트
-- [ ] 스트리밍 채팅
-- [ ] Tool Calling 지원
+- [x] continue-cli의 Ollama.ts 참조하여 구현
+- [x] 연결 테스트
+- [x] 스트리밍 채팅
+- [x] Tool Calling 지원
 
 **테스트:**
 ```bash
@@ -159,10 +159,10 @@ activo chat "hello"
 ```
 
 ### 1.3 기본 Tools 구현
-- [ ] ReadFile - 파일 읽기
-- [ ] GrepSearch - 텍스트 검색
-- [ ] FileGlobSearch - 파일 패턴 검색
-- [ ] RunTerminalCommand - 명령 실행
+- [x] ReadFile - 파일 읽기
+- [x] GrepSearch - 텍스트 검색
+- [x] FileGlobSearch - 파일 패턴 검색
+- [x] RunTerminalCommand - 명령 실행
 
 **테스트:**
 ```bash
@@ -172,9 +172,9 @@ activo chat "UserService 클래스 찾아줘"
 ```
 
 ### 1.4 세션 관리
-- [ ] 세션 생성/저장/로드
-- [ ] --resume 옵션
-- [ ] 히스토리 관리
+- [x] 세션 생성/저장/로드
+- [x] --resume 옵션
+- [x] 히스토리 관리
 
 **테스트:**
 ```bash
@@ -364,6 +364,14 @@ activo --version
 
 ## 진행 상황
 
-- **현재 단계**: Phase 0 준비
+- **현재 단계**: Phase 1 완료, Phase 2 준비
 - **마지막 업데이트**: 2025-01-30
-- **다음 작업**: 프로젝트 초기화 (package.json)
+- **다음 작업**: PDF → MD 변환 구현
+
+### 완료된 테스트
+- [x] `activo --version` → 0.1.0 출력
+- [x] `activo --help` → 명령어 목록 출력
+- [x] `activo config` → 설정 출력
+- [x] `activo config check-ollama` → Ollama 연결 확인
+- [x] `activo chat "..." -p` → Tool Calling 동작 확인
+- [x] `activo standards list` → 규칙 목록 (빈 상태)
