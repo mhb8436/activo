@@ -1,0 +1,52 @@
+{
+  "name": "activo-code",
+  "version": "0.1.0",
+  "description": "AI-powered code quality analyzer with development standards support",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "type": "module",
+  "bin": {
+    "activo": "dist/cli/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/cli/index.ts",
+    "start": "node dist/cli/index.js",
+    "test": "vitest run",
+    "test:watch": "vitest watch",
+    "lint": "eslint src/",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [
+    "code-quality",
+    "cli",
+    "ollama",
+    "ai",
+    "development-standards"
+  ],
+  "author": "",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "chalk": "^5.4.1",
+    "commander": "^14.0.0",
+    "glob": "^11.0.0",
+    "ink": "^6.1.0",
+    "ora": "^8.1.1",
+    "pdf-parse": "^1.1.1",
+    "react": "^19.1.0",
+    "uuid": "^10.0.0"
+  },
+  "devDependencies": {
+    "@types/glob": "^8.1.0",
+    "@types/node": "^22.10.0",
+    "@types/pdf-parse": "^1.1.4",
+    "@types/react": "^19.1.0",
+    "@types/uuid": "^10.0.0",
+    "tsx": "^4.20.0",
+    "typescript": "^5.8.0",
+    "vitest": "^3.2.0"
+  }
+}
