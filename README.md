@@ -42,7 +42,41 @@ activo --model qwen2.5:7b
 - Node.js 18+
 - [Ollama](https://ollama.ai) 실행 중
 
-## 설정
+## Ollama 설정
+
+### 1. Ollama 설치
+
+```bash
+# macOS
+brew install ollama
+
+# Windows
+# https://ollama.ai 에서 다운로드
+
+# Linux
+curl -fsSL https://ollama.ai/install.sh | sh
+```
+
+### 2. 모델 다운로드
+
+```bash
+# 권장 모델
+ollama pull mistral:latest
+
+# 한국어 지원 모델
+ollama pull qwen2.5:7b
+
+# 코드 특화 모델
+ollama pull codellama:7b
+```
+
+### 3. Ollama 실행
+
+```bash
+ollama serve
+```
+
+### 4. activo 설정
 
 `~/.activo/config.json`:
 ```json
@@ -52,6 +86,11 @@ activo --model qwen2.5:7b
     "model": "mistral:latest"
   }
 }
+```
+
+또는 CLI 옵션으로 모델 지정:
+```bash
+activo --model qwen2.5:7b
 ```
 
 ## 단축키
