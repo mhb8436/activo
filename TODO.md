@@ -1,333 +1,156 @@
 # TODO.md - activo-code 개발 계획
 
-## continue-cli 분석 결과
+## 아키텍처 (v0.2.0 - React Ink TUI)
 
-### 아키텍처 구조
-```
-continue/
-├── extensions/cli/          # CLI 애플리케이션
-│   ├── src/
-│   │   ├── index.ts         # 엔트리 (Commander.js)
-│   │   ├── commands/        # chat, login, serve 등
-│   │   ├── session.ts       # 세션 관리
-│   │   ├── tools/           # CLI 전용 도구 구현
-│   │   └── ui/              # React Ink TUI
-│   └── package.json
-├── core/                    # 핵심 라이브러리
-│   ├── llm/
-│   │   ├── llms/           # Ollama, OpenAI, Anthropic 등
-│   │   └── index.ts        # LLM 추상화
-│   ├── tools/
-│   │   ├── definitions/    # Tool 정의 (스키마)
-│   │   ├── implementations/# Tool 구현
-│   │   └── callTool.ts     # Tool 호출 로직
-│   └── config/             # 설정 관리
-└── packages/
-    └── @modelcontextprotocol/sdk  # MCP 지원
-```
-
-### 핵심 컴포넌트
-
-| 컴포넌트 | 파일 | 역할 |
-|----------|------|------|
-| CLI Entry | `extensions/cli/src/index.ts` | Commander.js 기반 명령어 |
-| Ollama LLM | `core/llm/llms/Ollama.ts` | Ollama 연동 + Tool Calling |
-| Tool System | `core/tools/callTool.ts` | 내장 + MCP 도구 호출 |
-| Session | `extensions/cli/src/session.ts` | 세션 저장/로드 |
-
-### 내장 Tools (activo에서 활용)
-- `ReadFile` - 파일 읽기
-- `CreateNewFile` - 파일 생성
-- `GrepSearch` - 텍스트 검색
-- `FileGlobSearch` - 파일 패턴 검색
-- `RunTerminalCommand` - 터미널 명령 실행
-- `ViewSubdirectory` - 디렉토리 탐색
-
----
-
-## 개발 전략: continue-cli 기반 커스터마이징
-
-### 접근 방식
-```
-continue-cli (포크/참조)
-      ↓
-불필요한 기능 제거 (login, remote, serve 등)
-      ↓
-품질 분석 특화 기능 추가
-      ↓
-activo-code
-```
-
-### 유지할 것
-- [x] Commander.js CLI 구조
-- [x] Ollama LLM 연동 (Tool Calling 포함)
-- [x] Tool 시스템 (ReadFile, Grep, Glob 등)
-- [x] Session 관리
-- [x] MCP 프로토콜 지원
-
-### 제거할 것
-- [ ] login/logout (Continue 계정 관련)
-- [ ] remote/serve (원격 에이전트)
-- [ ] Sentry/PostHog (텔레메트리)
-- [ ] WorkOS 인증
-- [ ] 불필요한 LLM 프로바이더들
-
-### 추가할 것
-- [ ] PDF → MD 변환 (pdf-parse)
-- [ ] 개발표준 규칙 로더
-- [ ] 코드 품질 분석 프롬프트
-- [ ] code-quality-checker 연동
-- [ ] 품질 리포트 생성
-
----
-
-## Phase 0: 프로젝트 셋업 ✅
-
-### 0.1 프로젝트 초기화
-- [x] continue-cli 구조 기반 프로젝트 생성
-- [x] package.json 설정
-- [x] TypeScript 설정 (tsconfig.json)
-- [x] 필수 의존성만 설치
-
-**테스트:**
-```bash
-pnpm install
-pnpm build
-```
-
-### 0.2 디렉토리 구조 생성
+### continue-cli 기반 새 구조
 ```
 activo-code/
 ├── src/
 │   ├── cli/
-│   │   ├── index.ts              # CLI 엔트리
-│   │   └── commands/
-│   │       ├── chat.ts           # 대화형 분석
-│   │       ├── standards.ts      # 규칙 관리
-│   │       ├── check.ts          # 표준 점검
-│   │       └── config.ts         # 설정
+│   │   ├── index.ts           # CLI 엔트리 (Commander.js + React Ink)
+│   │   ├── banner.ts          # ACTIVO ASCII 아트 배너
+│   │   └── headless.ts        # 비대화형 모드
 │   ├── core/
+│   │   ├── config.ts          # 설정 관리 (Ollama, MCP)
+│   │   ├── agent.ts           # 에이전트 (Tool Calling 루프)
 │   │   ├── llm/
-│   │   │   ├── ollama.ts         # Ollama 연동
-│   │   │   └── prompts.ts        # 프롬프트 템플릿
+│   │   │   └── ollama.ts      # Ollama 클라이언트 (스트리밍, Tool Calling)
 │   │   ├── tools/
-│   │   │   ├── definitions/      # 도구 정의
-│   │   │   ├── implementations/  # 도구 구현
-│   │   │   └── callTool.ts
-│   │   ├── standards/
-│   │   │   ├── pdf-parser.ts     # PDF 파싱
-│   │   │   ├── rule-loader.ts    # 규칙 로드
-│   │   │   └── rule-extractor.ts # 규칙 추출
-│   │   └── analyzer/
-│   │       └── quality.ts        # 품질 분석
-│   ├── session/
-│   │   └── index.ts              # 세션 관리
-│   └── utils/
+│   │   │   ├── types.ts       # Tool, ToolCall, ToolResult 타입
+│   │   │   ├── builtIn.ts     # 내장 도구 (파일, 검색, 명령)
+│   │   │   ├── standards.ts   # 표준 도구 (PDF, 품질 체크)
+│   │   │   └── index.ts       # 도구 레지스트리
+│   │   └── mcp/
+│   │       └── client.ts      # MCP 프로토콜 클라이언트
+│   └── ui/
+│       ├── App.tsx            # 메인 React Ink 앱
+│       └── components/
+│           ├── InputBox.tsx   # 입력창 컴포넌트
+│           ├── MessageList.tsx # 메시지 목록
+│           ├── StatusBar.tsx  # 상태바 (모델, 메시지 수)
+│           └── ToolStatus.tsx # 도구 실행 상태
 ├── package.json
 └── tsconfig.json
 ```
 
+### 핵심 기능
+- **자연어 인터페이스**: 터미널에서 한글로 명령 입력
+- **Tool Calling**: Ollama가 필요한 도구 자동 선택/실행
+- **MCP 지원**: 외부 도구 서버 연결 가능
+- **스트리밍**: 실시간 응답 출력
+
 ---
 
-## Phase 1: 기본 CLI + Ollama 연동 ✅
+## Phase 0: 프로젝트 리빌드 ✅
 
-### 1.1 CLI 프레임워크
-- [x] Commander.js 기반 CLI 엔트리 생성
-- [x] --version, --help 옵션
-- [x] config 명령어 (설정 확인/수정)
+### 0.1 React Ink TUI 구축
+- [x] ink, ink-spinner, ink-text-input 설치
+- [x] Commander.js + React Ink 통합
+- [x] ASCII 배너 (gradient-string)
+- [x] 대화형/비대화형 모드 분리
 
 **테스트:**
 ```bash
-activo --version          # 0.1.0
-activo --help             # 명령어 목록
-activo config             # 현재 설정
+node dist/cli/index.js --version     # 0.2.0
+node dist/cli/index.js --help        # 옵션 목록
+node dist/cli/index.js --print "test" # 배너 + 응답
 ```
 
-### 1.2 Ollama 클라이언트
-- [x] continue-cli의 Ollama.ts 참조하여 구현
-- [x] 연결 테스트
-- [x] 스트리밍 채팅
+### 0.2 Ollama 클라이언트
+- [x] 스트리밍 chat 지원
 - [x] Tool Calling 지원
-
-**테스트:**
-```bash
-# Ollama 상태 확인
-activo config check-ollama
-
-# 간단한 대화 테스트
-activo chat "hello"
-```
-
-### 1.3 기본 Tools 구현
-- [x] ReadFile - 파일 읽기
-- [x] GrepSearch - 텍스트 검색
-- [x] FileGlobSearch - 파일 패턴 검색
-- [x] RunTerminalCommand - 명령 실행
-
-**테스트:**
-```bash
-# 에이전트가 자동으로 도구 사용
-activo chat "src 폴더에 어떤 파일이 있어?"
-activo chat "UserService 클래스 찾아줘"
-```
-
-### 1.4 세션 관리
-- [x] 세션 생성/저장/로드
-- [x] --resume 옵션
-- [x] 히스토리 관리
-
-**테스트:**
-```bash
-activo chat "분석 시작"      # 새 세션
-activo chat --resume         # 이전 세션 이어서
-```
+- [x] 연결 상태 확인
 
 ---
 
-## Phase 2: PDF → MD 변환 ✅
+## Phase 1: Tool Calling 시스템 ✅
 
-### 2.1 PDF 파서
-- [x] pdf-parse 라이브러리 연동
-- [x] 텍스트 + 페이지 정보 추출
+### 1.1 내장 도구 (Built-in Tools)
+- [x] `read_file` - 파일 읽기
+- [x] `write_file` - 파일 쓰기
+- [x] `list_directory` - 디렉토리 목록
+- [x] `grep_search` - 텍스트 검색
+- [x] `glob_search` - 파일 패턴 검색
+- [x] `run_command` - 명령 실행
 
-**테스트:**
-```bash
-pnpm test src/core/standards/pdf-parser.test.ts
-```
+### 1.2 표준 도구 (Standards Tools)
+- [x] `import_pdf_standards` - PDF → MD 변환
+- [x] `list_standards` - 규칙 목록 조회
+- [x] `check_code_quality` - 코드 품질 체크
 
-### 2.2 청크 분할기
-- [x] 목차 기반 분할
-- [x] 페이지 단위 분할 (폴백)
-- [x] 2000자 단위 분할 (최후)
-
-**테스트:**
-```bash
-pnpm test src/core/standards/chunk-splitter.test.ts
-```
-
-### 2.3 규칙 추출기 (Ollama 활용)
-- [x] PDF 텍스트 → 구조화된 규칙 추출
-- [x] 규칙 ID, 심각도, 설명 파싱
-- [x] MD 포맷 생성
-
-**테스트:**
-```bash
-pnpm test src/core/standards/rule-extractor.test.ts
-```
-
-### 2.4 standards 명령어
-- [x] `activo standards import <pdf>` - PDF 변환
-- [x] `activo standards list` - 규칙 목록
-- [x] `activo standards validate` - MD 검증
-
-**테스트:**
-```bash
-activo standards import ./개발표준.pdf
-ls -la .activo/standards/
-activo standards list
-```
+### 1.3 에이전트 루프
+- [x] 시스템 프롬프트 정의
+- [x] 반복 Tool Calling 처리
+- [x] 스트리밍 이벤트 생성
 
 ---
 
-## Phase 3: 규칙 기반 코드 분석 ✅
+## Phase 2: MCP 지원 ✅
 
-### 3.1 규칙 로더
-- [x] .activo/standards/*.md 로드
-- [x] 파일 확장자별 필터링
-- [x] 프롬프트 컨텍스트 구성
+### 2.1 MCP 클라이언트
+- [x] StdioClientTransport 연동
+- [x] 도구 목록 조회
+- [x] 도구 호출 프록시
 
-**테스트:**
-```bash
-pnpm test src/core/standards/rule-loader.test.ts
-```
-
-### 3.2 품질 분석기
-- [x] 코드 + 규칙 → Ollama 프롬프트
-- [x] 위반 사항 파싱
-- [x] 결과 포맷팅
-
-**테스트:**
-```bash
-pnpm test src/core/analyzer/quality.test.ts
-```
-
-### 3.3 check 명령어
-- [x] `activo check <path>` - 표준 준수 점검
-- [x] `activo check --strict` - 엄격 모드
-- [x] 리포트 출력
-
-**테스트:**
-```bash
-# 위반 코드 준비
-echo 'class userService {}' > test.java
-
-activo check test.java
-# 출력: NR-001 위반 - 클래스명 PascalCase 사용 필요
-```
-
-### 3.4 대화형 분석 (chat 강화)
-- [x] 규칙 자동 로드
-- [x] 에이전트가 파일 탐색 → 분석 → 개선안 제시
-
-**테스트:**
-```bash
-activo chat "UserService.java 분석해줘"
-# 에이전트가:
-# 1. ReadFile로 파일 읽기
-# 2. 규칙 로드
-# 3. 분석 결과 출력
-```
+### 2.2 설정
+- [x] ~/.activo/config.json 지원
+- [x] MCP 서버 설정 구조
 
 ---
 
-## Phase 4: 통합 + 마무리
+## Phase 3: UI 컴포넌트 ✅
 
-### 4.1 code-quality-checker 연동
-- [ ] `activo explain -i result.json`
-- [ ] cqc 결과에 설명 추가
+### 3.1 React Ink 컴포넌트
+- [x] InputBox - 입력창 + 처리중 상태
+- [x] MessageList - 대화 기록 표시
+- [x] StatusBar - 모델, 메시지 수, 상태
+- [x] ToolStatus - 도구 실행 표시
 
-**테스트:**
-```bash
-activo explain -i cqc-result.json
-```
+### 3.2 상태 관리
+- [x] 메시지 히스토리
+- [x] 도구 호출 추적
+- [x] 에러 표시
+- [x] Ctrl+C 처리 (2회 종료)
 
-### 4.2 MCP 도구 지원 (선택)
-- [ ] MCP 프로토콜 지원
-- [ ] 외부 도구 연동 가능
+---
+
+## Phase 4: 통합 및 테스트
+
+### 4.1 빌드 검증
+- [x] TypeScript 컴파일
+- [x] 배너 출력 확인
+- [ ] Ollama 연동 테스트
+- [ ] Tool Calling 실행 테스트
+
+### 4.2 사용 시나리오 테스트
+- [ ] "src 폴더 구조 보여줘"
+- [ ] "이 프로젝트의 코드 품질 분석해줘"
+- [ ] "PDF 파일을 규칙으로 변환해줘"
+- [ ] "명명규칙 위반 찾아줘"
 
 ### 4.3 패키징
-- [ ] npm 패키지 설정
+- [ ] npm link 테스트
 - [ ] 글로벌 설치 테스트
-
-**테스트:**
-```bash
-npm link
-activo --version
-```
 
 ---
 
 ## 테스트 체크리스트
 
-### Phase 1 완료 조건
-| 테스트 | 명령어 | 예상 결과 | 상태 |
-|--------|--------|-----------|------|
-| 버전 | `activo --version` | 0.1.0 | ⬜ |
-| Ollama 연결 | `activo config check-ollama` | Connected | ⬜ |
-| 대화 | `activo chat "hello"` | 응답 출력 | ⬜ |
-| 도구 사용 | `activo chat "파일 목록"` | ls 결과 | ⬜ |
+### 빌드 & 기본 테스트
+| 항목 | 명령어 | 예상 결과 | 상태 |
+|------|--------|-----------|------|
+| 빌드 | `pnpm build` | 성공 | ✅ |
+| 버전 | `node dist/cli/index.js --version` | 0.2.0 | ✅ |
+| 도움말 | `node dist/cli/index.js --help` | 옵션 목록 | ✅ |
+| 배너 | `node dist/cli/index.js --print "test"` | ASCII 아트 | ✅ |
 
-### Phase 2 완료 조건
-| 테스트 | 명령어 | 예상 결과 | 상태 |
-|--------|--------|-----------|------|
-| PDF 변환 | `activo standards import x.pdf` | MD 생성 | ⬜ |
-| 규칙 목록 | `activo standards list` | 규칙 수 | ⬜ |
-
-### Phase 3 완료 조건
-| 테스트 | 명령어 | 예상 결과 | 상태 |
-|--------|--------|-----------|------|
-| 표준 점검 | `activo check test.java` | 위반 리포트 | ⬜ |
-| 대화형 분석 | `activo chat "분석해줘"` | 자동 분석 | ⬜ |
+### 대화 테스트
+| 항목 | 명령어 | 예상 결과 | 상태 |
+|------|--------|-----------|------|
+| 파일 목록 | "src 폴더에 뭐가 있어?" | list_directory 호출 | ⬜ |
+| 파일 읽기 | "package.json 보여줘" | read_file 호출 | ⬜ |
+| 검색 | "TODO 찾아줘" | grep_search 호출 | ⬜ |
+| 품질 체크 | "코드 품질 분석해줘" | check_code_quality 호출 | ⬜ |
 
 ---
 
@@ -339,41 +162,32 @@ activo --version
     "commander": "^14.0.0",
     "chalk": "^5.4.1",
     "ink": "^6.1.0",
+    "ink-spinner": "^5.0.0",
+    "ink-text-input": "^6.0.0",
     "react": "^19.1.0",
-    "uuid": "^9.0.1",
+    "gradient-string": "^3.0.0",
     "pdf-parse": "^1.1.1",
-    "@modelcontextprotocol/sdk": "^1.24.0"
+    "@modelcontextprotocol/sdk": "^1.25.0",
+    "@anthropic-ai/sdk": "^0.52.0",
+    "uuid": "^9.0.1",
+    "date-fns": "^4.1.0"
   }
 }
 ```
 
 ---
 
-## 참조 파일 (continue-cli)
-
-| 기능 | 파일 경로 |
-|------|-----------|
-| CLI 엔트리 | `extensions/cli/src/index.ts` |
-| Ollama 연동 | `core/llm/llms/Ollama.ts` |
-| Tool 호출 | `core/tools/callTool.ts` |
-| Tool 정의 | `core/tools/definitions/*.ts` |
-| Tool 구현 | `core/tools/implementations/*.ts` |
-| 세션 관리 | `extensions/cli/src/session.ts` |
-
----
-
 ## 진행 상황
 
-- **현재 단계**: Phase 3 완료, Phase 4 대기
+- **버전**: v0.2.0 (React Ink TUI 버전)
+- **현재 단계**: Phase 4.1 (빌드 검증)
 - **마지막 업데이트**: 2025-01-30
-- **다음 작업**: cqc 연동, MCP 지원, 패키징
+- **다음 작업**: Ollama 연동 테스트, 실사용 시나리오 검증
 
-### 완료된 테스트
-- [x] `activo --version` → 0.1.0 출력
-- [x] `activo --help` → 명령어 목록 출력
-- [x] `activo config` → 설정 출력
-- [x] `activo config check-ollama` → Ollama 연결 확인
-- [x] `activo chat "..." -p` → Tool Calling 동작 확인
-- [x] `activo standards list` → 규칙 목록 + 통계
-- [x] `activo standards validate` → 규칙 검증
-- [x] `activo check <file>` → 규칙 기반 코드 점검
+### 완료된 작업
+- [x] continue-cli 아키텍처 분석
+- [x] React Ink TUI 구현
+- [x] Tool Calling 시스템 구현
+- [x] MCP 클라이언트 구현
+- [x] ASCII 배너 구현
+- [x] 빌드 성공

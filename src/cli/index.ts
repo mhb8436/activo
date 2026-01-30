@@ -1,60 +1,53 @@
 #!/usr/bin/env node
 
 import { Command } from "commander";
-import { chat } from "./commands/chat.js";
-import { config } from "./commands/config.js";
-import { standards } from "./commands/standards.js";
-import { check } from "./commands/check.js";
+import { render } from "ink";
+import React from "react";
+import { App } from "../ui/App.js";
+import { showBanner } from "./banner.js";
+import { loadConfig } from "../core/config.js";
 
 const program = new Command();
 
 program
   .name("activo")
-  .description("AI-powered code quality analyzer with development standards support")
-  .version("0.1.0", "-v, --version", "Display version number");
+  .description("AI-powered code quality analyzer with Tool Calling and MCP support")
+  .version("0.2.0", "-v, --version", "Display version number");
 
-// Chat command (default)
 program
-  .command("chat [prompt]")
-  .description("Start an interactive chat session for code analysis")
+  .option("-p, --print", "Non-interactive mode (print and exit)")
+  .option("--headless", "Headless mode for CI/CD")
   .option("--resume", "Resume from last session")
-  .option("-p, --print", "Print response and exit (non-interactive)")
+  .option("--model <model>", "Specify Ollama model")
+  .argument("[prompt]", "Initial prompt")
   .action(async (prompt, options) => {
-    await chat(prompt, options);
-  });
+    // Show ASCII banner
+    showBanner();
 
-// Config command
-program
-  .command("config [action]")
-  .description("Manage configuration (show, set, check-ollama)")
-  .argument("[key]", "Configuration key")
-  .argument("[value]", "Configuration value")
-  .action(async (action, key, value) => {
-    await config(action, key, value);
-  });
+    // Load config
+    const config = loadConfig();
 
-// Standards command
-program
-  .command("standards <action>")
-  .description("Manage development standards (import, list, validate)")
-  .argument("[path]", "Path to PDF or standards directory")
-  .action(async (action, path) => {
-    await standards(action, path);
-  });
+    if (options.model) {
+      config.ollama.model = options.model;
+    }
 
-// Check command
-program
-  .command("check <path>")
-  .description("Check code against development standards")
-  .option("--strict", "Enable strict mode")
-  .option("--focus <area>", "Focus on specific area (naming, security, etc.)")
-  .action(async (path, options) => {
-    await check(path, options);
-  });
+    // Headless/print mode
+    if (options.print || options.headless) {
+      const { runHeadless } = await import("./headless.js");
+      await runHeadless(prompt, config);
+      return;
+    }
 
-// Default to chat if no command specified
-program.action(async () => {
-  await chat(undefined, {});
-});
+    // Interactive TUI mode
+    const { waitUntilExit } = render(
+      React.createElement(App, {
+        initialPrompt: prompt,
+        config,
+        resume: options.resume,
+      })
+    );
+
+    await waitUntilExit();
+  });
 
 program.parse();

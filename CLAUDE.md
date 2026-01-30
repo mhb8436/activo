@@ -2,18 +2,43 @@
 
 ## 프로젝트 개요
 
-activo-code는 개발표준 PDF를 Markdown으로 변환하고, Ollama 기반 LLM을 활용하여 코드 품질을 분석하는 CLI 도구입니다.
+activo-code는 continue-cli 아키텍처를 기반으로 한 AI 코드 품질 분석 CLI 도구입니다. React Ink TUI, Ollama Tool Calling, MCP 프로토콜을 지원합니다.
 
 ## 핵심 기능
 
-| 명령어 | 설명 |
-|--------|------|
-| `activo standards import <pdf>` | PDF → MD 변환 (청크 분할) |
-| `activo standards list` | 현재 규칙 목록 확인 |
-| `activo standards validate` | MD 문법 검증 |
-| `activo improve <path>` | 코드 개선점 분석 |
-| `activo check <path>` | 표준 준수 점검 |
-| `activo explain -i result.json` | code-quality-checker 결과 설명 |
+| 기능 | 설명 |
+|------|------|
+| 자연어 인터페이스 | 한글로 명령 입력, AI가 도구 자동 선택 |
+| Tool Calling | Ollama가 내장 도구 자동 호출 |
+| MCP 지원 | 외부 도구 서버 연결 가능 |
+| PDF 변환 | 개발표준 PDF → MD 규칙 변환 |
+| 코드 품질 분석 | 규칙 기반 코드 품질 체크 |
+
+## 사용 예시
+
+```bash
+# 대화형 모드 실행
+activo
+
+# 초기 프롬프트와 함께 실행
+activo "src 폴더 구조 보여줘"
+
+# 비대화형 모드 (print & exit)
+activo --print "package.json 분석해줘"
+
+# 특정 모델 사용
+activo --model qwen2.5:7b
+```
+
+## 자연어 명령 예시
+
+```
+• 이 프로젝트의 코드 품질을 분석해줘
+• PDF 파일을 마크다운 규칙으로 변환해줘
+• src 폴더의 명명규칙 위반을 찾아줘
+• UserService.ts 파일 보여줘
+• TODO 주석을 검색해줘
+```
 
 ## 아키텍처
 
@@ -21,122 +46,134 @@ activo-code는 개발표준 PDF를 Markdown으로 변환하고, Ollama 기반 LL
 activo-code/
 ├── src/
 │   ├── cli/
-│   │   ├── index.ts              # CLI 엔트리포인트
-│   │   └── commands/
-│   │       ├── standards.ts      # import, list, validate
-│   │       ├── improve.ts        # 개선점 분석
-│   │       ├── check.ts          # 표준 점검
-│   │       └── explain.ts        # cqc 연동
+│   │   ├── index.ts           # CLI 엔트리 (Commander.js + React Ink)
+│   │   ├── banner.ts          # ACTIVO ASCII 아트 배너
+│   │   └── headless.ts        # 비대화형 모드
 │   ├── core/
-│   │   ├── pdf-parser.ts         # PDF → 텍스트
-│   │   ├── chunk-splitter.ts     # 청크 분할
-│   │   ├── rule-extractor.ts     # Ollama로 규칙 추출
-│   │   ├── rule-loader.ts        # MD 로드
-│   │   └── analyzer.ts           # 코드 분석
-│   └── llm/
-│       ├── ollama.ts             # Ollama 클라이언트
-│       └── prompts.ts            # 프롬프트 템플릿
+│   │   ├── config.ts          # 설정 관리
+│   │   ├── agent.ts           # 에이전트 (Tool Calling 루프)
+│   │   ├── llm/
+│   │   │   └── ollama.ts      # Ollama 클라이언트
+│   │   ├── tools/
+│   │   │   ├── types.ts       # Tool 타입 정의
+│   │   │   ├── builtIn.ts     # 내장 도구
+│   │   │   ├── standards.ts   # 표준 관련 도구
+│   │   │   └── index.ts       # 도구 레지스트리
+│   │   └── mcp/
+│   │       └── client.ts      # MCP 클라이언트
+│   └── ui/
+│       ├── App.tsx            # 메인 React Ink 앱
+│       └── components/
+│           ├── InputBox.tsx   # 입력창
+│           ├── MessageList.tsx # 메시지 목록
+│           ├── StatusBar.tsx  # 상태바
+│           └── ToolStatus.tsx # 도구 상태
 ├── package.json
-└── .activo/
-    └── standards/                # 규칙 MD 저장 위치
+├── tsconfig.json
+├── TODO.md
+└── CLAUDE.md
 ```
 
 ## 기술 스택
 
 | 영역 | 기술 |
 |------|------|
-| 언어 | TypeScript (Node.js) |
+| 언어 | TypeScript (ESM) |
 | CLI | Commander.js |
+| TUI | React Ink 6.x |
+| LLM | Ollama (Tool Calling) |
+| MCP | @modelcontextprotocol/sdk |
 | PDF | pdf-parse |
-| LLM | ollama (npm 패키지) |
-| 출력 | chalk, ora |
 
-## Ollama 설정
+## 내장 도구 (Tools)
 
-- **코드 분석**: `codellama:7b`
-- **한국어 PDF 추출**: `qwen2.5:7b`
-- **메모리 제한**: 8GB
+### 파일 도구
+| 도구 | 설명 |
+|------|------|
+| `read_file` | 파일 읽기 |
+| `write_file` | 파일 쓰기 |
+| `list_directory` | 디렉토리 목록 |
+| `glob_search` | 파일 패턴 검색 |
+| `grep_search` | 텍스트 검색 |
+| `run_command` | 명령 실행 |
 
-## 개발 규칙
+### 표준 도구
+| 도구 | 설명 |
+|------|------|
+| `import_pdf_standards` | PDF → MD 변환 |
+| `list_standards` | 규칙 목록 조회 |
+| `check_code_quality` | 코드 품질 체크 |
 
-### 빌드 & 실행
+## 설정
+
+설정 파일: `~/.activo/config.json`
+
+```json
+{
+  "ollama": {
+    "baseUrl": "http://localhost:11434",
+    "model": "qwen2.5:7b"
+  },
+  "mcpServers": {
+    "example": {
+      "command": "npx",
+      "args": ["@example/mcp-server"],
+      "env": {}
+    }
+  },
+  "standardsDir": ".activo/standards"
+}
+```
+
+## 빌드 & 실행
 
 ```bash
 # 의존성 설치
 pnpm install
 
-# 개발 모드
-pnpm dev
-
 # 빌드
 pnpm build
 
+# 개발 모드
+pnpm dev
+
 # CLI 실행
 pnpm start
+
+# 버전 확인
+node dist/cli/index.js --version
 ```
 
-### 테스트
+## Ollama 설정
 
-```bash
-# 전체 테스트
-pnpm test
+**권장 모델:**
+- 코드 분석: `codellama:7b`, `qwen2.5-coder:7b`
+- 한국어 처리: `qwen2.5:7b`
+- 경량: `mistral:7b`
 
-# 단위 테스트
-pnpm test:unit
+**Tool Calling 요구사항:**
+- Ollama 0.5.0 이상 (native tool calling)
+- 최소 8GB 메모리 권장
 
-# 통합 테스트
-pnpm test:integration
+## MCP 서버 연결
+
+```json
+{
+  "mcpServers": {
+    "filesystem": {
+      "command": "npx",
+      "args": ["@anthropic-ai/mcp-server-filesystem", "/path/to/dir"]
+    }
+  }
+}
 ```
 
-## 단계별 테스트 수행 기록
-
-### Phase 1: CLI 프레임워크 + Ollama 연동
-
-| 단계 | 테스트 항목 | 명령어 | 예상 결과 |
-|------|-------------|--------|-----------|
-| 1.1 | CLI 초기화 | `activo --version` | 버전 출력 |
-| 1.2 | 도움말 | `activo --help` | 명령어 목록 |
-| 1.3 | Ollama 연결 | `activo config` | Ollama 상태 확인 |
-| 1.4 | 단일 파일 분석 | `activo improve ./test.ts` | 개선점 출력 |
-
-### Phase 2: PDF → MD 변환
-
-| 단계 | 테스트 항목 | 명령어 | 예상 결과 |
-|------|-------------|--------|-----------|
-| 2.1 | PDF 파싱 | `activo standards import ./test.pdf` | 텍스트 추출 |
-| 2.2 | 청크 분할 | 20페이지 이상 PDF | 여러 MD 파일 생성 |
-| 2.3 | 규칙 추출 | Ollama 호출 | 규칙 ID, 심각도 포함 |
-| 2.4 | MD 생성 | `.activo/standards/` 확인 | 구조화된 MD |
-
-### Phase 3: 규칙 로드 + 점검
-
-| 단계 | 테스트 항목 | 명령어 | 예상 결과 |
-|------|-------------|--------|-----------|
-| 3.1 | 규칙 목록 | `activo standards list` | 로드된 규칙 수 |
-| 3.2 | 표준 점검 | `activo check ./src/` | 위반 사항 리포트 |
-| 3.3 | cqc 연동 | `activo explain -i result.json` | 설명 추가된 결과 |
-| 3.4 | 언어별 필터 | Java 파일 분석 | Java 규칙만 적용 |
-
-## 참조 레포지토리
+## 참조
 
 - **continue-cli**: https://github.com/continuedev/continue
-  - CLI 구조: `extensions/cli/src/`
-  - Ollama 연동: `core/llm/llms/Ollama.ts`
-  - 설정 패턴: `core/config/`
-
-## 청크 분할 전략
-
-| PDF 크기 | 청크 크기 | MD 파일 수 |
-|----------|----------|-----------|
-| ~20페이지 | 전체 1개 | 1개 |
-| 20~50페이지 | 장/절 단위 | 3~5개 |
-| 50페이지+ | 2000자 단위 | 다수 |
-
-## 주의사항
-
-- Ollama 8GB 메모리 제한 고려
-- 규칙 MD가 클 경우 카테고리별 분리 호출
-- 분석 대상 언어에 맞는 규칙만 로드
+- **Ollama**: https://ollama.ai
+- **MCP**: https://modelcontextprotocol.io
+- **React Ink**: https://github.com/vadimdemedes/ink
 
 ## 라이선스
 

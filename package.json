@@ -1,7 +1,7 @@
 {
   "name": "activo-code",
-  "version": "0.1.0",
-  "description": "AI-powered code quality analyzer with development standards support",
+  "version": "0.2.0",
+  "description": "AI-powered code quality analyzer with React Ink TUI, Tool Calling, and MCP support",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "type": "module",
@@ -22,7 +22,9 @@
     "cli",
     "ollama",
     "ai",
-    "development-standards"
+    "mcp",
+    "tool-calling",
+    "react-ink"
   ],
   "author": "",
   "license": "MIT",
@@ -30,17 +32,22 @@
     "node": ">=18"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.52.0",
+    "@modelcontextprotocol/sdk": "^1.24.0",
     "chalk": "^5.4.1",
     "commander": "^14.0.0",
+    "date-fns": "^4.1.0",
     "glob": "^11.0.0",
+    "gradient-string": "^3.0.0",
     "ink": "^6.1.0",
-    "ora": "^8.1.1",
+    "ink-spinner": "^5.0.0",
+    "ink-text-input": "^6.0.0",
     "pdf-parse": "^1.1.1",
     "react": "^19.1.0",
     "uuid": "^10.0.0"
   },
   "devDependencies": {
-    "@types/glob": "^8.1.0",
+    "@types/gradient-string": "^1.1.6",
     "@types/node": "^22.10.0",
     "@types/pdf-parse": "^1.1.4",
     "@types/react": "^19.1.0",

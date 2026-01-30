@@ -27,3 +27,7 @@ coverage/
 
 # Activo local config
 .activo/
+
+# Claude
+CLAUDE.md
+.claude/

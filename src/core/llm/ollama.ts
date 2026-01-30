@@ -1,45 +1,21 @@
-import { loadConfig } from "../../cli/commands/config.js";
+import { OllamaConfig } from "../config.js";
+import { Tool, ToolCall } from "../tools/types.js";
 
 export interface ChatMessage {
   role: "system" | "user" | "assistant" | "tool";
   content: string;
   toolCalls?: ToolCall[];
+  toolCallId?: string;
 }
 
-export interface ToolCall {
-  id: string;
-  type: "function";
-  function: {
-    name: string;
-    arguments: string;
-  };
+export interface StreamEvent {
+  type: "content" | "tool_call" | "done" | "error";
+  content?: string;
+  toolCall?: ToolCall;
+  error?: string;
 }
 
-export interface Tool {
-  type: "function";
-  function: {
-    name: string;
-    description: string;
-    parameters: {
-      type: "object";
-      required?: string[];
-      properties: Record<string, {
-        type: string;
-        description: string;
-        enum?: string[];
-      }>;
-    };
-  };
-}
-
-export interface OllamaOptions {
-  model?: string;
-  baseUrl?: string;
-  stream?: boolean;
-  tools?: Tool[];
-}
-
-export interface OllamaChatResponse {
+interface OllamaChatResponse {
   model: string;
   message: {
     role: string;
@@ -57,36 +33,56 @@ export interface OllamaChatResponse {
 export class OllamaClient {
   private baseUrl: string;
   private model: string;
+  private contextLength: number;
+  private keepAlive: number;
 
-  constructor(options: OllamaOptions = {}) {
-    const config = loadConfig();
-    this.baseUrl = options.baseUrl || config.ollama.baseUrl;
-    this.model = options.model || config.ollama.model;
+  constructor(config: OllamaConfig) {
+    this.baseUrl = config.baseUrl;
+    this.model = config.model;
+    this.contextLength = config.contextLength;
+    this.keepAlive = config.keepAlive;
+  }
+
+  async isConnected(): Promise<boolean> {
+    try {
+      const response = await fetch(`${this.baseUrl}/api/tags`);
+      return response.ok;
+    } catch {
+      return false;
+    }
+  }
+
+  async listModels(): Promise<string[]> {
+    const response = await fetch(`${this.baseUrl}/api/tags`);
+    if (!response.ok) throw new Error("Failed to list models");
+    const data = (await response.json()) as { models: Array<{ name: string }> };
+    return data.models.map((m) => m.name);
   }
 
   async chat(
     messages: ChatMessage[],
-    options: { tools?: Tool[]; stream?: boolean } = {}
+    tools?: Tool[]
   ): Promise<ChatMessage> {
-    const ollamaMessages = messages.map((msg) => ({
-      role: msg.role,
-      content: msg.content,
-    }));
+    const ollamaMessages = this.convertMessages(messages);
 
     const body: Record<string, unknown> = {
       model: this.model,
       messages: ollamaMessages,
-      stream: options.stream ?? false,
+      stream: false,
+      options: {
+        num_ctx: this.contextLength,
+      },
+      keep_alive: this.keepAlive,
     };
 
-    // Add tools if the last message is from user
-    if (options.tools?.length && messages[messages.length - 1]?.role === "user") {
-      body.tools = options.tools.map((tool) => ({
+    // Add tools if last message is from user
+    if (tools?.length && messages[messages.length - 1]?.role === "user") {
+      body.tools = tools.map((tool) => ({
         type: "function",
         function: {
-          name: tool.function.name,
-          description: tool.function.description,
-          parameters: tool.function.parameters,
+          name: tool.name,
+          description: tool.description,
+          parameters: tool.parameters,
         },
       }));
     }
@@ -103,49 +99,33 @@ export class OllamaClient {
     }
 
     const data = (await response.json()) as OllamaChatResponse;
-
-    const result: ChatMessage = {
-      role: "assistant",
-      content: data.message.content,
-    };
-
-    // Handle tool calls
-    if (data.message.tool_calls?.length) {
-      result.toolCalls = data.message.tool_calls.map((tc, idx) => ({
-        id: `call_${idx}`,
-        type: "function" as const,
-        function: {
-          name: tc.function.name,
-          arguments: JSON.stringify(tc.function.arguments),
-        },
-      }));
-    }
-
-    return result;
+    return this.parseResponse(data);
   }
 
   async *streamChat(
     messages: ChatMessage[],
-    options: { tools?: Tool[] } = {}
-  ): AsyncGenerator<string> {
-    const ollamaMessages = messages.map((msg) => ({
-      role: msg.role,
-      content: msg.content,
-    }));
+    tools?: Tool[],
+    abortSignal?: AbortSignal
+  ): AsyncGenerator<StreamEvent> {
+    const ollamaMessages = this.convertMessages(messages);
 
     const body: Record<string, unknown> = {
       model: this.model,
       messages: ollamaMessages,
       stream: true,
+      options: {
+        num_ctx: this.contextLength,
+      },
+      keep_alive: this.keepAlive,
     };
 
-    if (options.tools?.length && messages[messages.length - 1]?.role === "user") {
-      body.tools = options.tools.map((tool) => ({
+    if (tools?.length && messages[messages.length - 1]?.role === "user") {
+      body.tools = tools.map((tool) => ({
         type: "function",
         function: {
-          name: tool.function.name,
-          description: tool.function.description,
-          parameters: tool.function.parameters,
+          name: tool.name,
+          description: tool.description,
+          parameters: tool.parameters,
         },
       }));
     }
@@ -154,18 +134,24 @@ export class OllamaClient {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
+      signal: abortSignal,
     });
 
     if (!response.ok) {
       const error = await response.text();
-      throw new Error(`Ollama error: ${error}`);
+      yield { type: "error", error: `Ollama error: ${error}` };
+      return;
     }
 
     const reader = response.body?.getReader();
-    if (!reader) throw new Error("No response body");
+    if (!reader) {
+      yield { type: "error", error: "No response body" };
+      return;
+    }
 
     const decoder = new TextDecoder();
     let buffer = "";
+    let accumulatedToolCalls: ToolCall[] = [];
 
     while (true) {
       const { done, value } = await reader.read();
@@ -176,35 +162,77 @@ export class OllamaClient {
       buffer = lines.pop() || "";
 
       for (const line of lines) {
-        if (line.trim()) {
-          try {
-            const data = JSON.parse(line) as OllamaChatResponse;
-            if (data.message?.content) {
-              yield data.message.content;
-            }
-          } catch {
-            // Skip invalid JSON
+        if (!line.trim()) continue;
+
+        try {
+          const data = JSON.parse(line) as OllamaChatResponse;
+
+          if (data.message?.content) {
+            yield { type: "content", content: data.message.content };
           }
+
+          if (data.message?.tool_calls?.length) {
+            for (const tc of data.message.tool_calls) {
+              const toolCall: ToolCall = {
+                id: `tc_${Date.now()}_${Math.random().toString(36).slice(2)}`,
+                name: tc.function.name,
+                arguments: tc.function.arguments,
+              };
+              accumulatedToolCalls.push(toolCall);
+              yield { type: "tool_call", toolCall };
+            }
+          }
+
+          if (data.done) {
+            yield { type: "done" };
+          }
+        } catch {
+          // Skip invalid JSON
         }
       }
     }
   }
 
-  async isConnected(): Promise<boolean> {
-    try {
-      const response = await fetch(`${this.baseUrl}/api/tags`);
-      return response.ok;
-    } catch {
-      return false;
-    }
+  private convertMessages(messages: ChatMessage[]): Array<{
+    role: string;
+    content: string;
+  }> {
+    return messages.map((msg) => {
+      if (msg.role === "tool") {
+        return {
+          role: "tool",
+          content: msg.content,
+        };
+      }
+      return {
+        role: msg.role,
+        content: msg.content,
+      };
+    });
   }
 
-  async listModels(): Promise<string[]> {
-    const response = await fetch(`${this.baseUrl}/api/tags`);
-    if (!response.ok) {
-      throw new Error("Failed to list models");
+  private parseResponse(data: OllamaChatResponse): ChatMessage {
+    const result: ChatMessage = {
+      role: "assistant",
+      content: data.message.content || "",
+    };
+
+    if (data.message.tool_calls?.length) {
+      result.toolCalls = data.message.tool_calls.map((tc, idx) => ({
+        id: `tc_${Date.now()}_${idx}`,
+        name: tc.function.name,
+        arguments: tc.function.arguments,
+      }));
     }
-    const data = (await response.json()) as { models: Array<{ name: string }> };
-    return data.models.map((m) => m.name);
+
+    return result;
+  }
+
+  getModel(): string {
+    return this.model;
+  }
+
+  setModel(model: string): void {
+    this.model = model;
   }
 }
