@@ -184,11 +184,11 @@ activo chat --resume         # 이전 세션 이어서
 
 ---
 
-## Phase 2: PDF → MD 변환
+## Phase 2: PDF → MD 변환 ✅
 
 ### 2.1 PDF 파서
-- [ ] pdf-parse 라이브러리 연동
-- [ ] 텍스트 + 페이지 정보 추출
+- [x] pdf-parse 라이브러리 연동
+- [x] 텍스트 + 페이지 정보 추출
 
 **테스트:**
 ```bash
@@ -196,9 +196,9 @@ pnpm test src/core/standards/pdf-parser.test.ts
 ```
 
 ### 2.2 청크 분할기
-- [ ] 목차 기반 분할
-- [ ] 페이지 단위 분할 (폴백)
-- [ ] 2000자 단위 분할 (최후)
+- [x] 목차 기반 분할
+- [x] 페이지 단위 분할 (폴백)
+- [x] 2000자 단위 분할 (최후)
 
 **테스트:**
 ```bash
@@ -206,9 +206,9 @@ pnpm test src/core/standards/chunk-splitter.test.ts
 ```
 
 ### 2.3 규칙 추출기 (Ollama 활용)
-- [ ] PDF 텍스트 → 구조화된 규칙 추출
-- [ ] 규칙 ID, 심각도, 설명 파싱
-- [ ] MD 포맷 생성
+- [x] PDF 텍스트 → 구조화된 규칙 추출
+- [x] 규칙 ID, 심각도, 설명 파싱
+- [x] MD 포맷 생성
 
 **테스트:**
 ```bash
@@ -216,9 +216,9 @@ pnpm test src/core/standards/rule-extractor.test.ts
 ```
 
 ### 2.4 standards 명령어
-- [ ] `activo standards import <pdf>` - PDF 변환
-- [ ] `activo standards list` - 규칙 목록
-- [ ] `activo standards validate` - MD 검증
+- [x] `activo standards import <pdf>` - PDF 변환
+- [x] `activo standards list` - 규칙 목록
+- [x] `activo standards validate` - MD 검증
 
 **테스트:**
 ```bash
@@ -364,9 +364,9 @@ activo --version
 
 ## 진행 상황
 
-- **현재 단계**: Phase 1 완료, Phase 2 준비
+- **현재 단계**: Phase 2 완료, Phase 3 진행 중
 - **마지막 업데이트**: 2025-01-30
-- **다음 작업**: PDF → MD 변환 구현
+- **다음 작업**: 규칙 기반 코드 분석 고도화
 
 ### 완료된 테스트
 - [x] `activo --version` → 0.1.0 출력
@@ -374,4 +374,6 @@ activo --version
 - [x] `activo config` → 설정 출력
 - [x] `activo config check-ollama` → Ollama 연결 확인
 - [x] `activo chat "..." -p` → Tool Calling 동작 확인
-- [x] `activo standards list` → 규칙 목록 (빈 상태)
+- [x] `activo standards list` → 규칙 목록 + 통계
+- [x] `activo standards validate` → 규칙 검증
+- [x] `activo check <file>` → 규칙 기반 코드 점검
