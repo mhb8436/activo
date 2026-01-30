@@ -29,5 +29,8 @@ coverage/
 .activo/
 
 # Claude
-CLAUDE.md
 .claude/
+
+# Markdown (except README.md)
+*.md
+!README.md
