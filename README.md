@@ -7,9 +7,11 @@ AI 기반 코드 품질 분석 CLI 도구
 ## 설치
 
 ```bash
-pnpm install
-pnpm build
-npm link
+# 글로벌 설치 (권장)
+npm install -g activo
+
+# 또는 npx로 바로 실행
+npx activo
 ```
 
 ## 사용법
@@ -23,6 +25,9 @@ activo "src 폴더 구조 보여줘"
 
 # 비대화형 모드
 activo --print "package.json 분석해줘"
+
+# 특정 모델 사용
+activo --model qwen2.5:7b
 ```
 
 ## 주요 기능

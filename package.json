@@ -1,7 +1,12 @@
 {
-  "name": "activo-code",
+  "name": "activo",
   "version": "0.2.0",
   "description": "AI-powered code quality analyzer with React Ink TUI, Tool Calling, and MCP support",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mhb8436/activo.git"
+  },
+  "homepage": "https://github.com/mhb8436/activo",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "type": "module",
