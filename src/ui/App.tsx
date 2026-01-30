@@ -3,6 +3,7 @@ import { Box, Text, useApp, useInput } from "ink";
 import { Config } from "../core/config.js";
 import { OllamaClient, ChatMessage } from "../core/llm/ollama.js";
 import { streamProcessMessage, AgentEvent } from "../core/agent.js";
+import { handleSlashCommand } from "../core/commands.js";
 import { InputBox } from "./components/InputBox.js";
 import { MessageList } from "./components/MessageList.js";
 import { StatusBar } from "./components/StatusBar.js";
@@ -33,6 +34,7 @@ export function App({ initialPrompt, config, resume }: AppProps): React.ReactEle
   const [toolStatus, setToolStatus] = useState<"running" | "complete" | "error" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [client] = useState(() => new OllamaClient(config.ollama));
+  const [currentModel, setCurrentModel] = useState(config.ollama.model);
   const [exitPending, setExitPending] = useState(false);
   const [cancelled, setCancelled] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -93,8 +95,42 @@ export function App({ initialPrompt, config, resume }: AppProps): React.ReactEle
     if (!text.trim() || isProcessing) return;
 
     setInput("");
-    setIsProcessing(true);
     setError(null);
+
+    // Handle slash commands first
+    if (text.startsWith("/")) {
+      const result = handleSlashCommand(text, config);
+      if (result) {
+        // Add command as user message
+        setMessages((prev) => [...prev, { role: "user", content: text }]);
+
+        if (result.exit) {
+          const exitMsg: Message = { role: "assistant", content: result.output || "Goodbye!" };
+          setMessages((prev) => [...prev, exitMsg]);
+          setTimeout(() => exit(), 500);
+          return;
+        }
+
+        if (result.clear) {
+          setMessages([]);
+          return;
+        }
+
+        if (result.changeModel) {
+          setCurrentModel(result.changeModel);
+          client.setModel(result.changeModel);
+        }
+
+        if (result.output) {
+          const outputMsg: Message = { role: "assistant", content: result.output };
+          setMessages((prev) => [...prev, outputMsg]);
+        }
+
+        return;
+      }
+    }
+
+    setIsProcessing(true);
     setCancelled(false);
 
     // Create AbortController for this request
@@ -229,7 +265,7 @@ export function App({ initialPrompt, config, resume }: AppProps): React.ReactEle
 
       {/* Status Bar */}
       <StatusBar
-        model={config.ollama.model}
+        model={currentModel}
         isProcessing={isProcessing}
         messageCount={messages.length}
       />
