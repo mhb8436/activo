@@ -39,6 +39,7 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.52.0",
     "@modelcontextprotocol/sdk": "^1.24.0",
+    "@ohah/hwpjs": "^0.1.0-rc.3",
     "chalk": "^5.4.1",
     "commander": "^14.0.0",
     "date-fns": "^4.1.0",

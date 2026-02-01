@@ -43,6 +43,7 @@ const BASE_SYSTEM_PROMPT = `You are ACTIVO, a code quality analyzer that MUST us
 - dependency_check, openapi_check, python_check: 기타
 - read_file, write_file, list_directory, grep_search, glob_search: 파일 작업
 - import_pdf_standards: PDF를 마크다운으로 변환 (pdfPath 필수)
+- import_hwp_standards: HWP(한글)를 마크다운으로 변환 (hwpPath 필수)
 
 ## Correct Behavior
 
