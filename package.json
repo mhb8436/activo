@@ -47,6 +47,7 @@
     "ink": "^6.1.0",
     "ink-spinner": "^5.0.0",
     "ink-text-input": "^6.0.0",
+    "java-ast": "^0.4.1",
     "pdf-parse": "^1.1.1",
     "react": "^19.1.0",
     "uuid": "^10.0.0"

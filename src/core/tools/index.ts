@@ -1,14 +1,34 @@
 import { Tool, ToolCall, ToolResult } from "./types.js";
 import { builtInTools } from "./builtIn.js";
 import { standardsTools } from "./standards.js";
+import { cacheTools } from "./cache.js";
+import { astTools } from "./ast.js";
+import { embeddingTools } from "./embeddings.js";
+import { memoryTools } from "./memory.js";
+import { javaTools } from "./javaAst.js";
+import { frontendTools } from "./frontendAst.js";
+import { sqlTools } from "./sqlAnalysis.js";
+import { mybatisTools } from "./mybatisAnalysis.js";
+import { cssTools } from "./cssAnalysis.js";
+import { htmlTools } from "./htmlAnalysis.js";
 
 export * from "./types.js";
 export * from "./builtIn.js";
 export * from "./standards.js";
+export * from "./cache.js";
+export * from "./ast.js";
+export * from "./embeddings.js";
+export * from "./memory.js";
+export * from "./javaAst.js";
+export * from "./frontendAst.js";
+export * from "./sqlAnalysis.js";
+export * from "./mybatisAnalysis.js";
+export * from "./cssAnalysis.js";
+export * from "./htmlAnalysis.js";
 
 // All available tools
 export function getAllTools(): Tool[] {
-  return [...builtInTools, ...standardsTools];
+  return [...builtInTools, ...standardsTools, ...cacheTools, ...astTools, ...embeddingTools, ...memoryTools, ...javaTools, ...frontendTools, ...sqlTools, ...mybatisTools, ...cssTools, ...htmlTools];
 }
 
 // Get tool by name

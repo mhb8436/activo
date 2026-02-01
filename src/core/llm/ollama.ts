@@ -235,4 +235,34 @@ export class OllamaClient {
   setModel(model: string): void {
     this.model = model;
   }
+
+  // Generate embeddings for text
+  async embed(text: string, model?: string): Promise<number[]> {
+    const response = await fetch(`${this.baseUrl}/api/embeddings`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: model || "nomic-embed-text",
+        prompt: text,
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Ollama embedding error: ${error}`);
+    }
+
+    const data = (await response.json()) as { embedding: number[] };
+    return data.embedding;
+  }
+
+  // Generate embeddings for multiple texts (batch)
+  async embedBatch(texts: string[], model?: string): Promise<number[][]> {
+    const embeddings: number[][] = [];
+    for (const text of texts) {
+      const embedding = await this.embed(text, model);
+      embeddings.push(embedding);
+    }
+    return embeddings;
+  }
 }
