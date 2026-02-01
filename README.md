@@ -71,6 +71,11 @@ activo --model qwen2.5:7b
 - **CSS/SCSS/LESS**: !important, 중첩 깊이, vendor prefix
 - **HTML/JSP**: 접근성(a11y), SEO, 시맨틱 태그, deprecated 태그
 
+### 의존성/API/Python
+- **의존성 검사**: package.json, pom.xml 취약점, deprecated 패키지
+- **OpenAPI 분석**: Swagger 스펙 검증, 엔드포인트 문서화 품질
+- **Python 분석**: Django/Flask/FastAPI 패턴, PEP8, 보안 이슈
+
 ### 개발 표준
 - **PDF 변환**: 개발표준 PDF → Markdown 변환
 - **코드 품질 분석**: 규칙 기반 코드 점검
@@ -102,6 +107,9 @@ activo --model qwen2.5:7b
 | | `mybatis_check` | MyBatis XML 매퍼 분석 |
 | **Web** | `css_check` | CSS/SCSS/LESS 분석 |
 | | `html_check` | HTML/JSP 접근성/SEO 분석 |
+| **의존성** | `dependency_check` | package.json, pom.xml 취약점 검사 |
+| **API** | `openapi_check` | OpenAPI/Swagger 스펙 분석 |
+| **Python** | `python_check` | Python/Django/Flask 분석 |
 | **RAG** | `index_codebase` | 벡터 인덱싱 |
 | | `semantic_search` | 의미 검색 |
 | | `find_similar_code` | 유사 코드 찾기 |
