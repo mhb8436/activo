@@ -1,6 +1,6 @@
 {
   "name": "activo",
-  "version": "0.2.2",
+  "version": "0.3.0",
   "description": "AI-powered code quality analyzer with React Ink TUI, Tool Calling, and MCP support",
   "repository": {
     "type": "git",
