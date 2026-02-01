@@ -2,6 +2,8 @@
 
 AI 기반 코드 품질 분석 CLI (Ollama)
 
+![Demo](demo.gif)
+
 ## 설치
 
 ```bash
