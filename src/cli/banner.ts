@@ -1,4 +1,8 @@
 import gradient from "gradient-string";
+import { createRequire } from "module";
+
+const require = createRequire(import.meta.url);
+const pkg = require("../../package.json");
 
 const ACTIVO_ASCII = `
     _    ____ _____ _____     _____
@@ -9,7 +13,7 @@ const ACTIVO_ASCII = `
 `;
 
 const SUBTITLE = "AI-Powered Code Quality Analyzer";
-const VERSION = "v0.2.0";
+const VERSION = `v${pkg.version}`;
 
 export function showBanner(): void {
   const activoGradient = gradient(["#00d4ff", "#7b2ff7", "#f107a3"]);
