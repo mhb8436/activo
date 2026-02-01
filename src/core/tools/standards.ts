@@ -8,7 +8,7 @@ import { loadConfig } from "../config.js";
 // Import PDF Tool
 export const importPdfTool: Tool = {
   name: "import_pdf_standards",
-  description: "Import development standards from a PDF file and convert to markdown rules.",
+  description: "Import development standards from a PDF file and convert to markdown (PDF를 마크다운으로 변환). Use when user asks: 'PDF 변환', 'PDF를 md로', 'PDF 마크다운', 'convert PDF'.",
   parameters: {
     type: "object",
     required: ["pdfPath"],

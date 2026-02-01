@@ -8,6 +8,13 @@ import { InputBox } from "./components/InputBox.js";
 import { MessageList } from "./components/MessageList.js";
 import { StatusBar } from "./components/StatusBar.js";
 import { ToolStatus } from "./components/ToolStatus.js";
+import {
+  createSession,
+  loadLatestSession,
+  saveSession,
+  getSessionContext,
+  cleanOldSessions,
+} from "../core/conversation.js";
 
 interface AppProps {
   initialPrompt?: string;
@@ -38,6 +45,10 @@ export function App({ initialPrompt, config, resume }: AppProps): React.ReactEle
   const [exitPending, setExitPending] = useState(false);
   const [cancelled, setCancelled] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
+
+  // Session management
+  const [session, setSession] = useState(() => createSession());
+  const [contextSummary, setContextSummary] = useState<string>("");
 
   // Handle Ctrl+C and ESC
   useInput((inputChar, key) => {
@@ -83,6 +94,35 @@ export function App({ initialPrompt, config, resume }: AppProps): React.ReactEle
     };
     checkConnection();
   }, [client, config.ollama.baseUrl]);
+
+  // Load previous session context on mount (if resume)
+  useEffect(() => {
+    const loadContext = async () => {
+      if (resume) {
+        try {
+          const { summary, recentMessages } = await getSessionContext(client, 5);
+          if (summary) {
+            setContextSummary(summary);
+          }
+          // Optionally load recent messages to display
+          if (recentMessages.length > 0) {
+            const displayMessages: Message[] = recentMessages
+              .filter(m => m.role === "user" || m.role === "assistant")
+              .map(m => ({
+                role: m.role as "user" | "assistant",
+                content: m.content,
+              }));
+            setMessages(displayMessages);
+          }
+        } catch {
+          // Ignore context loading errors
+        }
+      }
+      // Clean old sessions
+      cleanOldSessions(10);
+    };
+    loadContext();
+  }, [resume, client]);
 
   // Process initial prompt
   useEffect(() => {
@@ -154,7 +194,7 @@ export function App({ initialPrompt, config, resume }: AppProps): React.ReactEle
     try {
       let fullContent = "";
 
-      for await (const event of streamProcessMessage(text, history, client, config, abortController.signal)) {
+      for await (const event of streamProcessMessage(text, history, client, config, abortController.signal, contextSummary)) {
         // Check if cancelled
         if (abortController.signal.aborted) {
           break;
@@ -225,8 +265,28 @@ export function App({ initialPrompt, config, resume }: AppProps): React.ReactEle
       setCurrentTool(null);
       setToolStatus(null);
       abortControllerRef.current = null;
+
+      // Save conversation to session
+      setSession((prevSession) => {
+        const updatedSession = { ...prevSession };
+        // Add user message
+        updatedSession.messages.push({ role: "user", content: text });
+        // Add assistant message (get from current messages state)
+        setMessages((currentMessages) => {
+          const lastMessage = currentMessages[currentMessages.length - 1];
+          if (lastMessage?.role === "assistant") {
+            updatedSession.messages.push({
+              role: "assistant",
+              content: lastMessage.content,
+            });
+          }
+          return currentMessages;
+        });
+        saveSession(updatedSession);
+        return updatedSession;
+      });
     }
-  }, [messages, client, config, isProcessing]);
+  }, [messages, client, config, isProcessing, contextSummary]);
 
   return (
     <Box flexDirection="column" height="100%">

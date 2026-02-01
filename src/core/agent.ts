@@ -21,7 +21,7 @@ export interface AgentResult {
   }>;
 }
 
-const SYSTEM_PROMPT = `You are ACTIVO, a code quality analyzer that MUST use tools.
+const BASE_SYSTEM_PROMPT = `You are ACTIVO, a code quality analyzer that MUST use tools.
 
 ## CRITICAL RULES - NEVER VIOLATE
 
@@ -41,7 +41,8 @@ const SYSTEM_PROMPT = `You are ACTIVO, a code quality analyzer that MUST use too
 - ast_analyze, react_check, vue_check, jquery_check: JS/TS 분석
 - css_check, html_check: CSS/HTML 분석
 - dependency_check, openapi_check, python_check: 기타
-- read_file, list_directory, grep_search, glob_search: 파일 작업
+- read_file, write_file, list_directory, grep_search, glob_search: 파일 작업
+- import_pdf_standards: PDF를 마크다운으로 변환 (pdfPath 필수)
 
 ## Correct Behavior
 
@@ -64,22 +65,35 @@ User: "src/**/*.java 분석해줘"
 3. Summarize ONLY what the tool returned
 4. Use Korean if user speaks Korean`;
 
+// Build system prompt with optional context
+function buildSystemPrompt(contextSummary?: string): string {
+  if (!contextSummary) {
+    return BASE_SYSTEM_PROMPT;
+  }
+
+  return `${BASE_SYSTEM_PROMPT}
+
+## 이전 대화 컨텍스트
+
+${contextSummary}
+
+---
+위 내용은 이전 세션에서의 대화 요약입니다. 필요시 참고하세요.`;
+}
+
 export async function processMessage(
   userMessage: string,
   history: ChatMessage[],
   client: OllamaClient,
   config: Config,
-  onEvent?: (event: AgentEvent) => void
+  onEvent?: (event: AgentEvent) => void,
+  contextSummary?: string
 ): Promise<AgentResult> {
   const tools = getAllTools();
-  const toolDefinitions = tools.map((t) => ({
-    name: t.name,
-    description: t.description,
-    parameters: t.parameters,
-  }));
+  const systemPrompt = buildSystemPrompt(contextSummary);
 
   const messages: ChatMessage[] = [
-    { role: "system", content: SYSTEM_PROMPT },
+    { role: "system", content: systemPrompt },
     ...history,
     { role: "user", content: userMessage },
   ];
@@ -156,12 +170,14 @@ export async function* streamProcessMessage(
   history: ChatMessage[],
   client: OllamaClient,
   config: Config,
-  abortSignal?: AbortSignal
+  abortSignal?: AbortSignal,
+  contextSummary?: string
 ): AsyncGenerator<AgentEvent> {
   const tools = getAllTools();
+  const systemPrompt = buildSystemPrompt(contextSummary);
 
   const messages: ChatMessage[] = [
-    { role: "system", content: SYSTEM_PROMPT },
+    { role: "system", content: systemPrompt },
     ...history,
     { role: "user", content: userMessage },
   ];
