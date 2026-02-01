@@ -14,6 +14,7 @@ export interface ToolParameter {
   description: string;
   enum?: string[];
   default?: unknown;
+  items?: { type: string };
 }
 
 export interface ToolCall {

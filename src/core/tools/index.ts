@@ -14,6 +14,7 @@ import { htmlTools } from "./htmlAnalysis.js";
 import { dependencyTools } from "./dependencyAnalysis.js";
 import { openapiTools } from "./openapiAnalysis.js";
 import { pythonTools } from "./pythonAnalysis.js";
+import { analyzeAllTools } from "./analyzeAll.js";
 
 export * from "./types.js";
 export * from "./builtIn.js";
@@ -31,10 +32,11 @@ export * from "./htmlAnalysis.js";
 export * from "./dependencyAnalysis.js";
 export * from "./openapiAnalysis.js";
 export * from "./pythonAnalysis.js";
+export * from "./analyzeAll.js";
 
 // All available tools
 export function getAllTools(): Tool[] {
-  return [...builtInTools, ...standardsTools, ...cacheTools, ...astTools, ...embeddingTools, ...memoryTools, ...javaTools, ...frontendTools, ...sqlTools, ...mybatisTools, ...cssTools, ...htmlTools, ...dependencyTools, ...openapiTools, ...pythonTools];
+  return [...builtInTools, ...standardsTools, ...cacheTools, ...astTools, ...embeddingTools, ...memoryTools, ...javaTools, ...frontendTools, ...sqlTools, ...mybatisTools, ...cssTools, ...htmlTools, ...dependencyTools, ...openapiTools, ...pythonTools, ...analyzeAllTools];
 }
 
 // Get tool by name

@@ -110,6 +110,7 @@ activo --model qwen2.5:7b
 | **의존성** | `dependency_check` | package.json, pom.xml 취약점 검사 |
 | **API** | `openapi_check` | OpenAPI/Swagger 스펙 분석 |
 | **Python** | `python_check` | Python/Django/Flask 분석 |
+| **통합** | `analyze_all` | 디렉토리 전체 자동 분석 |
 | **RAG** | `index_codebase` | 벡터 인덱싱 |
 | | `semantic_search` | 의미 검색 |
 | | `find_similar_code` | 유사 코드 찾기 |
