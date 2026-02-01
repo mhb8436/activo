@@ -75,8 +75,8 @@ export class OllamaClient {
       keep_alive: this.keepAlive,
     };
 
-    // Add tools if last message is from user
-    if (tools?.length && messages[messages.length - 1]?.role === "user") {
+    // Always add tools if provided (needed for multi-turn tool use)
+    if (tools?.length) {
       body.tools = tools.map((tool) => ({
         type: "function",
         function: {
@@ -109,17 +109,22 @@ export class OllamaClient {
   ): AsyncGenerator<StreamEvent> {
     const ollamaMessages = this.convertMessages(messages);
 
+    // Use non-streaming mode when tools are provided to avoid hallucination
+    // (LLM often outputs fake results before tool calls in streaming mode)
+    const useStreaming = !tools?.length;
+
     const body: Record<string, unknown> = {
       model: this.model,
       messages: ollamaMessages,
-      stream: true,
+      stream: useStreaming,
       options: {
         num_ctx: this.contextLength,
       },
       keep_alive: this.keepAlive,
     };
 
-    if (tools?.length && messages[messages.length - 1]?.role === "user") {
+    // Always add tools if provided (needed for multi-turn tool use)
+    if (tools?.length) {
       body.tools = tools.map((tool) => ({
         type: "function",
         function: {
@@ -143,6 +148,30 @@ export class OllamaClient {
       return;
     }
 
+    // Non-streaming mode for tool calls (avoids hallucination where LLM outputs text before calling tools)
+    if (!useStreaming) {
+      const data = (await response.json()) as OllamaChatResponse;
+
+      // Handle tool calls first (ignore content when tools are called)
+      if (data.message?.tool_calls?.length) {
+        for (const tc of data.message.tool_calls) {
+          const toolCall: ToolCall = {
+            id: `tc_${Date.now()}_${Math.random().toString(36).slice(2)}`,
+            name: tc.function.name,
+            arguments: tc.function.arguments,
+          };
+          yield { type: "tool_call", toolCall };
+        }
+      } else if (data.message?.content) {
+        // Only yield content if no tool calls
+        yield { type: "content", content: data.message.content };
+      }
+
+      yield { type: "done" };
+      return;
+    }
+
+    // Streaming mode (no tools)
     const reader = response.body?.getReader();
     if (!reader) {
       yield { type: "error", error: "No response body" };
@@ -151,7 +180,6 @@ export class OllamaClient {
 
     const decoder = new TextDecoder();
     let buffer = "";
-    let accumulatedToolCalls: ToolCall[] = [];
 
     while (true) {
       const { done, value } = await reader.read();
@@ -169,18 +197,6 @@ export class OllamaClient {
 
           if (data.message?.content) {
             yield { type: "content", content: data.message.content };
-          }
-
-          if (data.message?.tool_calls?.length) {
-            for (const tc of data.message.tool_calls) {
-              const toolCall: ToolCall = {
-                id: `tc_${Date.now()}_${Math.random().toString(36).slice(2)}`,
-                name: tc.function.name,
-                arguments: tc.function.arguments,
-              };
-              accumulatedToolCalls.push(toolCall);
-              yield { type: "tool_call", toolCall };
-            }
           }
 
           if (data.done) {

@@ -21,53 +21,18 @@ export interface AgentResult {
   }>;
 }
 
-const BASE_SYSTEM_PROMPT = `You are ACTIVO, a code quality analyzer.
+const BASE_SYSTEM_PROMPT = `You are ACTIVO. Call tools immediately. No explanation before tool calls.
 
-## ABSOLUTE RULE: NO TEXT WHEN CALLING TOOLS
+Tools:
+- import_hwp_standards(hwpPath, outputDir): HWP→마크다운
+- import_pdf_standards(pdfPath, outputDir): PDF→마크다운
+- analyze_all(path): 코드분석
+- read_file, list_directory, grep_search: 파일작업
 
-When you call a tool, output NOTHING else. No text before, no text after. ONLY the tool call.
-
-WRONG (NEVER DO THIS):
-\`\`\`
-실행 중... ← NO!
-[some explanation] ← NO!
-tool_call(...)
-결과: ... ← NO! (you don't have results yet)
-\`\`\`
-
-CORRECT:
-\`\`\`
-tool_call(...)
-\`\`\`
-
-## AFTER TOOL RETURNS
-
-Only AFTER you receive the actual tool result, you may write a response summarizing what the tool returned.
-
-## HALLUCINATION = FAILURE
-
-If you write ANY of these WITHOUT a tool result, you have FAILED:
-- File names (e.g., "UserService.java")
-- Numbers (e.g., "복잡도: 15", "3개 파일")
-- Paths (e.g., "/path/to/file.md")
-- Status messages (e.g., "변환 완료!", "성공")
-
-## Tools
-
-- analyze_all: 코드 분석
-- import_pdf_standards: PDF→마크다운 (pdfPath 필수)
-- import_hwp_standards: HWP→마크다운 (hwpPath 필수)
-- read_file, write_file, list_directory, grep_search, glob_search: 파일
-
-## Example
-
-User: "HWP 파일을 마크다운으로 변환해줘"
-
-YOUR RESPONSE (no other text):
-→ Call import_hwp_standards with hwpPath
-
-AFTER tool returns result:
-→ Now you can summarize the actual result`;
+Rules:
+1. User request → Call tool immediately
+2. No text output before tool call
+3. After tool result → Summarize in Korean`;
 
 // Build system prompt with optional context
 function buildSystemPrompt(contextSummary?: string): string {
@@ -203,21 +168,29 @@ export async function* streamProcessMessage(
     let fullContent = "";
     const pendingToolCalls: ToolCall[] = [];
 
+    // Collect all events first (non-streaming mode for tools)
     for await (const event of client.streamChat(messages, tools as Tool[], abortSignal)) {
-      // Check if aborted during streaming
       if (abortSignal?.aborted) {
         yield { type: "error", error: "Operation cancelled" };
         return;
       }
       if (event.type === "content" && event.content) {
         fullContent += event.content;
-        yield { type: "content", content: event.content };
+        // Don't yield content yet - wait to see if there are tool calls
       } else if (event.type === "tool_call" && event.toolCall) {
         pendingToolCalls.push(event.toolCall);
       } else if (event.type === "error") {
         yield { type: "error", error: event.error };
         return;
       }
+    }
+
+    // Only yield content if NO tool calls (avoid hallucinated pre-tool text)
+    if (pendingToolCalls.length === 0 && fullContent) {
+      yield { type: "content", content: fullContent };
+    } else if (pendingToolCalls.length > 0) {
+      // Clear content when tool calls exist
+      fullContent = "";
     }
 
     messages.push({ role: "assistant", content: fullContent, toolCalls: pendingToolCalls.length > 0 ? pendingToolCalls : undefined });
