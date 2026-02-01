@@ -1,10 +1,198 @@
 import fs from "fs";
 import path from "path";
+import crypto from "crypto";
 import pdfParse from "pdf-parse";
 import { toMarkdown as hwpToMarkdown } from "@ohah/hwpjs";
 import { Tool, ToolResult } from "./types.js";
 import { OllamaClient } from "../llm/ollama.js";
 import { loadConfig } from "../config.js";
+
+// RAG constants
+const STANDARDS_EMBEDDINGS_DIR = ".activo/standards-rag";
+const DEFAULT_EMBED_MODEL = "nomic-embed-text";
+
+// RAG interfaces
+interface StandardsChunk {
+  filepath: string;
+  section: string;
+  ruleId?: string;
+  content: string;
+}
+
+interface StandardsEmbedding {
+  chunk: StandardsChunk;
+  embedding: number[];
+  hash: string;
+}
+
+interface StandardsIndex {
+  version: string;
+  model: string;
+  createdAt: string;
+  updatedAt: string;
+  totalChunks: number;
+}
+
+// RAG helper functions
+function getStandardsRagDir(): string {
+  return path.resolve(process.cwd(), STANDARDS_EMBEDDINGS_DIR);
+}
+
+function ensureStandardsRagDir(): void {
+  const dir = getStandardsRagDir();
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+}
+
+function getStandardsIndexPath(): string {
+  return path.join(getStandardsRagDir(), "index.json");
+}
+
+function getStandardsDataPath(): string {
+  return path.join(getStandardsRagDir(), "embeddings.json");
+}
+
+function loadStandardsIndex(): StandardsIndex | null {
+  const indexPath = getStandardsIndexPath();
+  if (fs.existsSync(indexPath)) {
+    try {
+      return JSON.parse(fs.readFileSync(indexPath, "utf-8"));
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
+function saveStandardsIndex(index: StandardsIndex): void {
+  ensureStandardsRagDir();
+  fs.writeFileSync(getStandardsIndexPath(), JSON.stringify(index, null, 2));
+}
+
+function loadStandardsEmbeddings(): StandardsEmbedding[] {
+  const dataPath = getStandardsDataPath();
+  if (fs.existsSync(dataPath)) {
+    try {
+      return JSON.parse(fs.readFileSync(dataPath, "utf-8"));
+    } catch {
+      return [];
+    }
+  }
+  return [];
+}
+
+function saveStandardsEmbeddings(data: StandardsEmbedding[]): void {
+  ensureStandardsRagDir();
+  fs.writeFileSync(getStandardsDataPath(), JSON.stringify(data));
+}
+
+function calculateHash(content: string): string {
+  return crypto.createHash("md5").update(content).digest("hex");
+}
+
+// Split markdown into semantic chunks (by sections/rules)
+function splitStandardsIntoChunks(content: string, filepath: string): StandardsChunk[] {
+  const chunks: StandardsChunk[] = [];
+  const lines = content.split("\n");
+
+  let currentSection = "";
+  let currentRuleId: string | undefined;
+  let currentContent: string[] = [];
+  let inRule = false;
+
+  for (const line of lines) {
+    // Detect rule pattern: ## RULE-XXX: Title
+    const ruleMatch = line.match(/^##\s+(RULE-\d+):\s*(.+)/i);
+    // Detect section headers
+    const sectionMatch = line.match(/^#+\s+(.+)/);
+
+    if (ruleMatch) {
+      // Save previous chunk
+      if (currentContent.length > 0) {
+        const text = currentContent.join("\n").trim();
+        if (text) {
+          chunks.push({
+            filepath,
+            section: currentSection,
+            ruleId: currentRuleId,
+            content: text,
+          });
+        }
+      }
+      currentRuleId = ruleMatch[1];
+      currentSection = ruleMatch[2];
+      currentContent = [line];
+      inRule = true;
+    } else if (sectionMatch && !inRule) {
+      // Save previous chunk
+      if (currentContent.length > 0) {
+        const text = currentContent.join("\n").trim();
+        if (text) {
+          chunks.push({
+            filepath,
+            section: currentSection,
+            ruleId: currentRuleId,
+            content: text,
+          });
+        }
+      }
+      currentSection = sectionMatch[1];
+      currentRuleId = undefined;
+      currentContent = [line];
+    } else if (line.match(/^##/) && inRule) {
+      // End of rule, start new section
+      if (currentContent.length > 0) {
+        const text = currentContent.join("\n").trim();
+        if (text) {
+          chunks.push({
+            filepath,
+            section: currentSection,
+            ruleId: currentRuleId,
+            content: text,
+          });
+        }
+      }
+      inRule = false;
+      currentRuleId = undefined;
+      const newSection = line.match(/^#+\s+(.+)/);
+      currentSection = newSection ? newSection[1] : "";
+      currentContent = [line];
+    } else {
+      currentContent.push(line);
+    }
+  }
+
+  // Save remaining content
+  if (currentContent.length > 0) {
+    const text = currentContent.join("\n").trim();
+    if (text) {
+      chunks.push({
+        filepath,
+        section: currentSection,
+        ruleId: currentRuleId,
+        content: text,
+      });
+    }
+  }
+
+  // Filter out small chunks (less than 50 chars)
+  return chunks.filter(c => c.content.length >= 50);
+}
+
+// Cosine similarity
+function cosineSimilarity(a: number[], b: number[]): number {
+  if (a.length !== b.length) return 0;
+  let dotProduct = 0;
+  let normA = 0;
+  let normB = 0;
+  for (let i = 0; i < a.length; i++) {
+    dotProduct += a[i] * b[i];
+    normA += a[i] * a[i];
+    normB += b[i] * b[i];
+  }
+  return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
+}
 
 // Resolve natural language directory paths
 function resolveOutputDir(outputDir: string | undefined): string {
@@ -436,10 +624,266 @@ export const importHwpTool: Tool = {
   },
 };
 
+// Index Standards for RAG
+export const indexStandardsTool: Tool = {
+  name: "index_standards",
+  description: "Index development standards for RAG search. Run this after importing PDF/HWP files to enable semantic search.",
+  parameters: {
+    type: "object",
+    properties: {
+      directory: {
+        type: "string",
+        description: "Standards directory (default: .activo/standards)",
+      },
+    },
+  },
+  handler: async (args): Promise<ToolResult> => {
+    try {
+      const dir = resolveOutputDir(args.directory as string | undefined);
+
+      if (!fs.existsSync(dir)) {
+        return { success: false, content: "", error: `Standards directory not found: ${dir}` };
+      }
+
+      const files = fs.readdirSync(dir).filter((f) => f.endsWith(".md") && f !== "_index.md");
+      if (files.length === 0) {
+        return { success: false, content: "", error: "No markdown files found in standards directory" };
+      }
+
+      const config = loadConfig();
+      const client = new OllamaClient(config.ollama);
+
+      const allChunks: StandardsChunk[] = [];
+
+      // Collect all chunks from all files
+      for (const file of files) {
+        const content = fs.readFileSync(path.join(dir, file), "utf-8");
+        const chunks = splitStandardsIntoChunks(content, file);
+        allChunks.push(...chunks);
+      }
+
+      if (allChunks.length === 0) {
+        return { success: false, content: "", error: "No valid chunks found in standards files" };
+      }
+
+      // Generate embeddings
+      const embeddings: StandardsEmbedding[] = [];
+      let processed = 0;
+
+      for (const chunk of allChunks) {
+        const embedding = await client.embed(chunk.content, DEFAULT_EMBED_MODEL);
+        embeddings.push({
+          chunk,
+          embedding,
+          hash: calculateHash(chunk.content),
+        });
+        processed++;
+      }
+
+      // Save embeddings
+      saveStandardsEmbeddings(embeddings);
+
+      // Save index
+      const index: StandardsIndex = {
+        version: "1.0",
+        model: DEFAULT_EMBED_MODEL,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        totalChunks: embeddings.length,
+      };
+      saveStandardsIndex(index);
+
+      return {
+        success: true,
+        content: `Standards indexed successfully!\n\n` +
+          `📂 Directory: ${dir}\n` +
+          `📄 Files: ${files.length}\n` +
+          `🔖 Chunks: ${embeddings.length}\n` +
+          `🧠 Model: ${DEFAULT_EMBED_MODEL}\n\n` +
+          `Use 'search_standards' to find relevant rules.`,
+      };
+    } catch (error) {
+      return { success: false, content: "", error: String(error) };
+    }
+  },
+};
+
+// Search Standards using RAG
+export const searchStandardsTool: Tool = {
+  name: "search_standards",
+  description: "Search development standards using semantic search (RAG). Returns relevant rules/sections based on query.",
+  parameters: {
+    type: "object",
+    required: ["query"],
+    properties: {
+      query: {
+        type: "string",
+        description: "Search query (e.g., 'variable naming', 'error handling', 'SQL injection')",
+      },
+      topK: {
+        type: "number",
+        description: "Number of results to return (default: 5)",
+      },
+    },
+  },
+  handler: async (args): Promise<ToolResult> => {
+    try {
+      const query = args.query as string;
+      const topK = (args.topK as number) || 5;
+
+      const embeddings = loadStandardsEmbeddings();
+      if (embeddings.length === 0) {
+        return {
+          success: false,
+          content: "",
+          error: "No standards indexed. Run 'index_standards' first.",
+        };
+      }
+
+      const config = loadConfig();
+      const client = new OllamaClient(config.ollama);
+
+      // Get query embedding
+      const queryEmbedding = await client.embed(query, DEFAULT_EMBED_MODEL);
+
+      // Calculate similarities
+      const results = embeddings.map((e) => ({
+        ...e,
+        similarity: cosineSimilarity(queryEmbedding, e.embedding),
+      }));
+
+      // Sort by similarity and get top K
+      results.sort((a, b) => b.similarity - a.similarity);
+      const topResults = results.slice(0, topK);
+
+      // Format results
+      let output = `## Search Results for: "${query}"\n\n`;
+      output += `Found ${topResults.length} relevant standards:\n\n`;
+
+      for (let i = 0; i < topResults.length; i++) {
+        const r = topResults[i];
+        output += `### ${i + 1}. ${r.chunk.ruleId || r.chunk.section || "Section"}\n`;
+        output += `📄 File: ${r.chunk.filepath}\n`;
+        output += `📊 Relevance: ${(r.similarity * 100).toFixed(1)}%\n\n`;
+        output += `${r.chunk.content.slice(0, 500)}${r.chunk.content.length > 500 ? "..." : ""}\n\n`;
+        output += `---\n\n`;
+      }
+
+      return { success: true, content: output };
+    } catch (error) {
+      return { success: false, content: "", error: String(error) };
+    }
+  },
+};
+
+// Check Code Quality with RAG
+export const checkQualityWithRagTool: Tool = {
+  name: "check_quality_rag",
+  description: "Check code quality using RAG to find relevant standards automatically.",
+  parameters: {
+    type: "object",
+    required: ["filepath"],
+    properties: {
+      filepath: {
+        type: "string",
+        description: "File to check",
+      },
+      topK: {
+        type: "number",
+        description: "Number of relevant standards to use (default: 5)",
+      },
+    },
+  },
+  handler: async (args): Promise<ToolResult> => {
+    try {
+      const filepath = path.resolve(args.filepath as string);
+      const topK = (args.topK as number) || 5;
+
+      if (!fs.existsSync(filepath)) {
+        return { success: false, content: "", error: `File not found: ${filepath}` };
+      }
+
+      const embeddings = loadStandardsEmbeddings();
+      if (embeddings.length === 0) {
+        return {
+          success: false,
+          content: "",
+          error: "No standards indexed. Run 'index_standards' first after importing PDF/HWP.",
+        };
+      }
+
+      // Read code
+      const code = fs.readFileSync(filepath, "utf-8");
+      const config = loadConfig();
+      const client = new OllamaClient(config.ollama);
+
+      // Create query from code (first 1000 chars + filename)
+      const queryText = `Code analysis for ${path.basename(filepath)}:\n${code.slice(0, 1000)}`;
+      const queryEmbedding = await client.embed(queryText, DEFAULT_EMBED_MODEL);
+
+      // Find relevant standards
+      const results = embeddings.map((e) => ({
+        ...e,
+        similarity: cosineSimilarity(queryEmbedding, e.embedding),
+      }));
+      results.sort((a, b) => b.similarity - a.similarity);
+      const relevantStandards = results.slice(0, topK);
+
+      // Build standards context
+      let standardsContext = "## Relevant Development Standards\n\n";
+      for (const r of relevantStandards) {
+        if (r.chunk.ruleId) {
+          standardsContext += `### ${r.chunk.ruleId}: ${r.chunk.section}\n`;
+        } else {
+          standardsContext += `### ${r.chunk.section}\n`;
+        }
+        standardsContext += `${r.chunk.content}\n\n`;
+      }
+
+      // Build analysis prompt
+      const ext = path.extname(filepath);
+      const lang = { ".ts": "typescript", ".js": "javascript", ".java": "java", ".py": "python" }[ext] || "text";
+
+      const prompt = `You are a code quality expert. Analyze the code based on the provided development standards.
+
+${standardsContext}
+
+## Code to Analyze
+File: ${filepath}
+\`\`\`${lang}
+${code.slice(0, 6000)}
+\`\`\`
+
+## Analysis Request
+1. Check for violations of the above standards
+2. Provide specific line numbers if possible
+3. Suggest improvements
+4. Rate overall compliance (1-10)
+
+Respond in Korean.`;
+
+      const response = await client.chat([{ role: "user", content: prompt }]);
+
+      return {
+        success: true,
+        content: `## Code Quality Analysis (RAG)\n\n` +
+          `📄 File: ${filepath}\n` +
+          `🔖 Standards used: ${relevantStandards.length}\n\n` +
+          `---\n\n${response.content}`,
+      };
+    } catch (error) {
+      return { success: false, content: "", error: String(error) };
+    }
+  },
+};
+
 // All standards tools
 export const standardsTools: Tool[] = [
   importPdfTool,
   importHwpTool,
   listStandardsTool,
   checkQualityTool,
+  indexStandardsTool,
+  searchStandardsTool,
+  checkQualityWithRagTool,
 ];

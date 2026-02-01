@@ -31,9 +31,12 @@ const BASE_SYSTEM_PROMPT = `You are ACTIVO, a code quality analyzer. You MUST ca
 
 ## TOOLS BY CATEGORY
 
-### Document Conversion
+### Document Conversion & RAG
 - import_hwp_standards(hwpPath, outputDir): Convert HWP to markdown
 - import_pdf_standards(pdfPath, outputDir): Convert PDF to markdown
+- index_standards(directory?): Index standards for RAG search (run after import)
+- search_standards(query, topK?): Search standards by semantic query
+- check_quality_rag(filepath, topK?): Check code using RAG to find relevant standards
 
 ### Code Analysis (Recommended: use analyze_all)
 - analyze_all(path, include?): Analyze all code (Java/JS/TS/Python)
