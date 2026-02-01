@@ -3,16 +3,20 @@
 import { Command } from "commander";
 import { render } from "ink";
 import React from "react";
+import { createRequire } from "module";
 import { App } from "../ui/App.js";
 import { showBanner } from "./banner.js";
 import { loadConfig } from "../core/config.js";
+
+const require = createRequire(import.meta.url);
+const pkg = require("../../package.json");
 
 const program = new Command();
 
 program
   .name("activo")
   .description("AI-powered code quality analyzer with Tool Calling and MCP support")
-  .version("0.2.0", "-v, --version", "Display version number");
+  .version(pkg.version, "-v, --version", "Display version number");
 
 program
   .option("-p, --print", "Non-interactive mode (print and exit)")
