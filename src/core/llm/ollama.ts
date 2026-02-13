@@ -1,5 +1,5 @@
 import { OllamaConfig } from "../config.js";
-import { Tool, ToolCall } from "../tools/types.js";
+import type { Tool, ToolCall } from "../tools/types.js";
 
 export interface ChatMessage {
   role: "system" | "user" | "assistant" | "tool";
@@ -28,6 +28,65 @@ interface OllamaChatResponse {
     }>;
   };
   done: boolean;
+}
+
+// Estimate token count for a string (rough: ~3 chars per token for mixed Korean/English)
+function estimateTokens(text: string): number {
+  if (!text) return 0;
+  return Math.ceil(text.length / 3);
+}
+
+// Estimate tokens for tool definitions sent to Ollama
+function estimateToolTokens(tools: Tool[]): number {
+  let total = 0;
+  for (const tool of tools) {
+    // name + description + JSON schema overhead
+    total += estimateTokens(tool.name) + estimateTokens(tool.description) + 20;
+    if (tool.parameters?.properties) {
+      for (const [key, prop] of Object.entries(tool.parameters.properties)) {
+        total += estimateTokens(key) + estimateTokens((prop as { description?: string }).description || "") + 10;
+      }
+    }
+  }
+  return total;
+}
+
+// Prune messages to fit within context window
+function pruneMessages(
+  messages: Array<{ role: string; content: string }>,
+  maxContextTokens: number,
+  toolTokens: number
+): Array<{ role: string; content: string }> {
+  if (messages.length <= 2) return messages;
+
+  const responseReserve = 1000; // reserve tokens for model response
+  const safetyBuffer = 200;
+  const budget = maxContextTokens - toolTokens - responseReserve - safetyBuffer;
+
+  // Always preserve: first message (system) and last message (user)
+  const systemMsg = messages[0];
+  const lastMsg = messages[messages.length - 1];
+  const history = messages.slice(1, -1);
+
+  let usedTokens = estimateTokens(systemMsg.content) + estimateTokens(lastMsg.content);
+
+  // If even system + last message exceeds budget, truncate system prompt
+  if (usedTokens > budget) {
+    const maxSystemChars = Math.max(200, (budget - estimateTokens(lastMsg.content)) * 3);
+    systemMsg.content = systemMsg.content.slice(0, maxSystemChars);
+    return [systemMsg, lastMsg];
+  }
+
+  // Add messages from newest to oldest
+  const kept: Array<{ role: string; content: string }> = [];
+  for (let i = history.length - 1; i >= 0; i--) {
+    const msgTokens = estimateTokens(history[i].content) + 4; // 4 tokens overhead per message
+    if (usedTokens + msgTokens > budget) break;
+    kept.unshift(history[i]);
+    usedTokens += msgTokens;
+  }
+
+  return [systemMsg, ...kept, lastMsg];
 }
 
 export class OllamaClient {
@@ -63,7 +122,11 @@ export class OllamaClient {
     messages: ChatMessage[],
     tools?: Tool[]
   ): Promise<ChatMessage> {
-    const ollamaMessages = this.convertMessages(messages);
+    let ollamaMessages = this.convertMessages(messages);
+
+    // Prune messages to fit within context window
+    const toolTokens = tools?.length ? estimateToolTokens(tools) : 0;
+    ollamaMessages = pruneMessages(ollamaMessages, this.contextLength, toolTokens);
 
     const body: Record<string, unknown> = {
       model: this.model,
@@ -107,7 +170,11 @@ export class OllamaClient {
     tools?: Tool[],
     abortSignal?: AbortSignal
   ): AsyncGenerator<StreamEvent> {
-    const ollamaMessages = this.convertMessages(messages);
+    let ollamaMessages = this.convertMessages(messages);
+
+    // Prune messages to fit within context window
+    const toolTokens = tools?.length ? estimateToolTokens(tools) : 0;
+    ollamaMessages = pruneMessages(ollamaMessages, this.contextLength, toolTokens);
 
     // Use non-streaming mode when tools are provided to avoid hallucination
     // (LLM often outputs fake results before tool calls in streaming mode)

@@ -1,6 +1,6 @@
 import { OllamaClient, ChatMessage } from "./llm/ollama.js";
 import { Config } from "./config.js";
-import { getAllTools, executeTool, ToolCall, ToolResult, Tool } from "./tools/index.js";
+import { getAllTools, selectTools, executeTool, ToolCall, ToolResult, Tool } from "./tools/index.js";
 
 export interface AgentEvent {
   type: "thinking" | "content" | "tool_use" | "tool_result" | "done" | "error";
@@ -23,52 +23,11 @@ export interface AgentResult {
 
 const BASE_SYSTEM_PROMPT = `You are ACTIVO, a code quality analyzer. You MUST call tools to perform tasks.
 
-## CRITICAL RULES
+## RULES
 1. Call tool IMMEDIATELY when user requests an action
-2. NEVER output text before calling a tool
-3. NEVER fabricate results - only report actual tool output
-4. After tool returns, summarize in user's language (Korean if user speaks Korean)
-
-## TOOLS BY CATEGORY
-
-### Document Conversion & RAG
-- import_hwp_standards(hwpPath, outputDir): Convert HWP to markdown
-- import_pdf_standards(pdfPath, outputDir): Convert PDF to markdown
-- index_standards(directory?): Index standards for RAG search (run after import)
-- search_standards(query, topK?): Search standards by semantic query
-- check_quality_rag(filepath, topK?): Check code using RAG to find relevant standards
-
-### Code Analysis (Recommended: use analyze_all)
-- analyze_all(path, include?): Analyze all code (Java/JS/TS/Python)
-- java_analyze(path): Java code analysis
-- java_complexity(path): Java complexity metrics
-- spring_check(path): Spring pattern check
-- ast_analyze(path): JS/TS AST analysis
-- react_check(path): React pattern check
-- vue_check(path): Vue pattern check
-- python_check(path): Python code analysis
-
-### SQL/DB Analysis
-- sql_check(path): SQL query analysis
-- mybatis_check(path): MyBatis mapper analysis
-
-### Web Analysis
-- css_check(path): CSS analysis
-- html_check(path): HTML analysis
-- dependency_check(path): package.json dependency analysis
-- openapi_check(path): OpenAPI spec analysis
-
-### File Operations
-- read_file(path): Read file content
-- write_file(path, content): Write file
-- list_directory(path): List directory contents
-- grep_search(pattern, path): Search pattern in files
-- glob_search(pattern): Search files by pattern
-
-## EXAMPLE
-User: "Analyze src folder"
-→ Call analyze_all(path="src") immediately
-→ After result: Summarize findings`;
+2. NEVER fabricate results - only report actual tool output
+3. After tool returns, summarize in user's language (Korean if user speaks Korean)
+4. Use analyze_all for broad code analysis`;
 
 // Build system prompt with optional context
 function buildSystemPrompt(contextSummary?: string): string {
@@ -94,7 +53,7 @@ export async function processMessage(
   onEvent?: (event: AgentEvent) => void,
   contextSummary?: string
 ): Promise<AgentResult> {
-  const tools = getAllTools();
+  const tools = selectTools(userMessage);
   const systemPrompt = buildSystemPrompt(contextSummary);
 
   const messages: ChatMessage[] = [
@@ -178,7 +137,7 @@ export async function* streamProcessMessage(
   abortSignal?: AbortSignal,
   contextSummary?: string
 ): AsyncGenerator<AgentEvent> {
-  const tools = getAllTools();
+  const tools = selectTools(userMessage);
   const systemPrompt = buildSystemPrompt(contextSummary);
 
   const messages: ChatMessage[] = [

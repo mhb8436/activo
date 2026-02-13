@@ -29,7 +29,7 @@ const DEFAULT_CONFIG: Config = {
   ollama: {
     baseUrl: "http://localhost:11434",
     model: "mistral:latest",
-    contextLength: 8192,
+    contextLength: 4096,
     keepAlive: 1800, // 30 minutes
   },
   standards: {
