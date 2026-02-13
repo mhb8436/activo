@@ -225,32 +225,20 @@ export const analyzeAllTools: Tool[] = [
           }
         }
 
-        // Spring 패턴 (파일 단위)
+        // Spring 패턴 (glob 기반)
         const springCheckTool = javaTools.find(t => t.name === "spring_check");
         if (springCheckTool) {
-          const sampleFiles = fileStats.java.slice(0, 20);
-          const springResults: any[] = [];
-          for (const file of sampleFiles) {
-            try {
-              const r = await springCheckTool.handler({ filepath: file, format: "json" });
-              if (r.success) {
-                const parsed = JSON.parse(r.content);
-                if (parsed.annotations?.length > 0 || parsed.patterns?.length > 0) {
-                  springResults.push({ file, result: parsed });
-                }
-              }
-            } catch (e) { /* ignore */ }
-          }
-          if (springResults.length > 0) {
-            results.push({
-              tool: "spring_check",
-              success: true,
-              summary: {
-                springFiles: springResults.length,
-                samples: springResults.slice(0, 10),
-              },
-            });
-          }
+          const springPattern = path.join(targetPath, "**/*.java");
+          try {
+            const r = await springCheckTool.handler({ pattern: springPattern });
+            if (r.success) {
+              results.push({
+                tool: "spring_check",
+                success: true,
+                summary: r.content,
+              });
+            }
+          } catch (e) { /* ignore */ }
         }
 
         // SQL in Java (디렉토리 단위)
@@ -433,12 +421,12 @@ export const analyzeAllTools: Tool[] = [
         const summary = result.summary;
 
         // 각 도구별 이슈 추출
-        if (result.tool === "java_analyze" && summary.files) {
-          summary.files.forEach((f: any) => {
-            if (f.issues?.length > 0) {
-              toolIssues.push(...f.issues.slice(0, 3));
+        if (result.tool === "java_analyze" && summary.samples) {
+          for (const sample of summary.samples) {
+            if (sample.result?.issues?.length > 0) {
+              toolIssues.push(...sample.result.issues.slice(0, 5).map((i: any) => i.message));
             }
-          });
+          }
         }
         if (result.tool === "mybatis_check" && summary.injectionRisks > 0) {
           toolIssues.push(`SQL Injection 위험 ${summary.injectionRisks}건`);

@@ -38,12 +38,22 @@ interface JavaClassInfo {
   innerClasses: JavaClassInfo[];
 }
 
+// Quality issue
+interface QualityIssue {
+  type: "npe-risk" | "exception-antipattern" | "dead-code";
+  severity: "error" | "warning" | "info";
+  line: number;
+  message: string;
+  suggestion: string;
+}
+
 // Java file analysis result
 interface JavaFileAnalysis {
   filepath: string;
   package: string;
   imports: string[];
   classes: JavaClassInfo[];
+  issues: QualityIssue[];
   complexity: {
     total: number;
     average: number;
@@ -78,6 +88,198 @@ function calculateComplexity(methodText: string): number {
   return complexity;
 }
 
+// Detect NullPointerException risk patterns
+function detectNPERisks(content: string): QualityIssue[] {
+  const issues: QualityIssue[] = [];
+  const lines = content.split("\n");
+
+  const patterns: Array<{ regex: RegExp; message: string; suggestion: string }> = [
+    {
+      regex: /\.get\([^)]*\)\s*\.toString\s*\(/,
+      message: ".get().toString() — null일 때 NPE 발생",
+      suggestion: "Objects.toString() 또는 null 체크 후 호출",
+    },
+    {
+      regex: /\.get\([^)]*\)\s*\.equals\s*\(/,
+      message: ".get().equals() — null일 때 NPE 발생",
+      suggestion: "리터럴.equals(obj) 또는 Objects.equals() 사용",
+    },
+    {
+      regex: /\(\s*String\s*\)\s*\w+\.get\s*\(/,
+      message: "(String) map.get() — null 캐스팅 시 NPE 위험",
+      suggestion: "String.valueOf() 또는 Optional 사용",
+    },
+    {
+      regex: /\.get\([^)]*\)\s*\.(length|size)\s*\(/,
+      message: ".get().length()/size() — null 체이닝 NPE 위험",
+      suggestion: "null 체크 후 호출 또는 Optional 사용",
+    },
+  ];
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    // Skip comments
+    const trimmed = line.trim();
+    if (trimmed.startsWith("//") || trimmed.startsWith("*") || trimmed.startsWith("/*")) continue;
+
+    for (const p of patterns) {
+      if (p.regex.test(line)) {
+        issues.push({
+          type: "npe-risk",
+          severity: "error",
+          line: i + 1,
+          message: p.message,
+          suggestion: p.suggestion,
+        });
+      }
+    }
+  }
+
+  return issues;
+}
+
+// Detect exception handling anti-patterns
+function detectExceptionAntiPatterns(content: string): QualityIssue[] {
+  const issues: QualityIssue[] = [];
+  const lines = content.split("\n");
+
+  // 1. Empty catch blocks
+  const emptyCatchRegex = /catch\s*\([^)]+\)\s*\{\s*\}/g;
+  let match: RegExpExecArray | null;
+  while ((match = emptyCatchRegex.exec(content)) !== null) {
+    const lineNum = content.substring(0, match.index).split("\n").length;
+    issues.push({
+      type: "exception-antipattern",
+      severity: "warning",
+      line: lineNum,
+      message: "빈 catch 블록 — 예외가 무시됨",
+      suggestion: "최소한 로그를 남기거나 rethrow 하세요",
+    });
+  }
+
+  // 2. Multi-line empty catch (catch with only whitespace)
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+
+    // e.printStackTrace()
+    if (line.includes(".printStackTrace()")) {
+      issues.push({
+        type: "exception-antipattern",
+        severity: "warning",
+        line: i + 1,
+        message: "e.printStackTrace() 사용 — 프로덕션 부적합",
+        suggestion: "Logger를 사용하세요 (LOGGER.error(\"msg\", e))",
+      });
+    }
+
+    // LOGGER.info in catch block - check context
+    if (/LOGGER\s*\.\s*info\s*\(/.test(line) || /log\s*\.\s*info\s*\(/i.test(line)) {
+      // Look backwards to see if we're inside a catch block
+      for (let j = i - 1; j >= Math.max(0, i - 10); j--) {
+        if (/catch\s*\(/.test(lines[j])) {
+          issues.push({
+            type: "exception-antipattern",
+            severity: "warning",
+            line: i + 1,
+            message: "catch 블록에서 info 레벨 로그 — error/warn 사용 권장",
+            suggestion: "LOGGER.error() 또는 LOGGER.warn() 사용",
+          });
+          break;
+        }
+        if (lines[j].trim() === "}") break; // exited the block
+      }
+    }
+  }
+
+  // 3. Unused exception variable in catch
+  const catchVarRegex = /catch\s*\(\s*\w+\s+(\w+)\s*\)/g;
+  while ((match = catchVarRegex.exec(content)) !== null) {
+    const varName = match[1];
+    const catchStart = match.index + match[0].length;
+
+    // Find the matching closing brace
+    let braceCount = 0;
+    let blockEnd = catchStart;
+    for (let i = catchStart; i < content.length; i++) {
+      if (content[i] === "{") braceCount++;
+      if (content[i] === "}") {
+        braceCount--;
+        if (braceCount === 0) {
+          blockEnd = i;
+          break;
+        }
+      }
+    }
+
+    const catchBody = content.substring(catchStart, blockEnd);
+    // Check if variable is referenced in catch body (exclude the declaration itself)
+    const varUsageRegex = new RegExp(`\\b${varName}\\b`);
+    if (!varUsageRegex.test(catchBody)) {
+      const lineNum = content.substring(0, match.index).split("\n").length;
+      issues.push({
+        type: "exception-antipattern",
+        severity: "warning",
+        line: lineNum,
+        message: `catch 블록에서 예외 변수 '${varName}' 미사용`,
+        suggestion: "예외 정보를 로깅하거나, 필요 없으면 변수명을 'ignored'로 변경",
+      });
+    }
+  }
+
+  return issues;
+}
+
+// Detect commented-out code blocks
+function detectCommentedOutCode(content: string): QualityIssue[] {
+  const issues: QualityIssue[] = [];
+  const lines = content.split("\n");
+  const codeKeywords = /\b(if|else|return|public|private|protected|import|class|interface|void|int|String|new|throw|try|catch|for|while)\b/;
+
+  let consecutiveComments: number[] = [];
+
+  for (let i = 0; i < lines.length; i++) {
+    const trimmed = lines[i].trim();
+    if (trimmed.startsWith("//") && !trimmed.startsWith("///") && !trimmed.startsWith("// TODO") && !trimmed.startsWith("// FIXME") && !trimmed.startsWith("// NOTE")) {
+      consecutiveComments.push(i);
+    } else {
+      // Check if we had a block of 5+ consecutive comment lines with code keywords
+      if (consecutiveComments.length >= 5) {
+        const commentBlock = consecutiveComments
+          .map((idx) => lines[idx].trim().substring(2).trim())
+          .join("\n");
+        if (codeKeywords.test(commentBlock)) {
+          issues.push({
+            type: "dead-code",
+            severity: "info",
+            line: consecutiveComments[0] + 1,
+            message: `주석 처리된 코드 블록 (${consecutiveComments.length}줄, L${consecutiveComments[0] + 1}-L${consecutiveComments[consecutiveComments.length - 1] + 1})`,
+            suggestion: "사용하지 않는 코드는 삭제하세요 (VCS에서 복원 가능)",
+          });
+        }
+      }
+      consecutiveComments = [];
+    }
+  }
+
+  // Check trailing block
+  if (consecutiveComments.length >= 5) {
+    const commentBlock = consecutiveComments
+      .map((idx) => lines[idx].trim().substring(2).trim())
+      .join("\n");
+    if (codeKeywords.test(commentBlock)) {
+      issues.push({
+        type: "dead-code",
+        severity: "info",
+        line: consecutiveComments[0] + 1,
+        message: `주석 처리된 코드 블록 (${consecutiveComments.length}줄, L${consecutiveComments[0] + 1}-L${consecutiveComments[consecutiveComments.length - 1] + 1})`,
+        suggestion: "사용하지 않는 코드는 삭제하세요 (VCS에서 복원 가능)",
+      });
+    }
+  }
+
+  return issues;
+}
+
 // Analyze Java file
 function analyzeJavaFile(content: string, filepath: string): JavaFileAnalysis {
   const analysis: JavaFileAnalysis = {
@@ -85,6 +287,7 @@ function analyzeJavaFile(content: string, filepath: string): JavaFileAnalysis {
     package: "",
     imports: [],
     classes: [],
+    issues: [],
     complexity: { total: 0, average: 0, highest: { name: "", value: 0 } },
   };
 
@@ -417,6 +620,11 @@ function analyzeJavaFile(content: string, filepath: string): JavaFileAnalysis {
         { name: "", value: 0 }
       );
     }
+
+    // Quality issue detection
+    analysis.issues.push(...detectNPERisks(content));
+    analysis.issues.push(...detectExceptionAntiPatterns(content));
+    analysis.issues.push(...detectCommentedOutCode(content));
   } catch (error) {
     // If parsing fails, try basic regex extraction
     const classMatch = content.match(/(?:public\s+)?(?:abstract\s+)?(?:class|interface|enum)\s+(\w+)/);
@@ -503,6 +711,16 @@ function formatJavaAnalysis(analysis: JavaFileAnalysis): string {
   lines.push(`   총합: ${analysis.complexity.total} | 평균: ${analysis.complexity.average}`);
   if (analysis.complexity.highest.name) {
     lines.push(`   최고: ${analysis.complexity.highest.name} (${analysis.complexity.highest.value})`);
+  }
+
+  if (analysis.issues.length > 0) {
+    lines.push("");
+    const severityIcon = { error: "🔴", warning: "🟡", info: "🔵" };
+    lines.push(`⚠️ 이슈 (${analysis.issues.length}건):`);
+    for (const issue of analysis.issues) {
+      lines.push(`   ${severityIcon[issue.severity]} L${issue.line}: ${issue.message}`);
+      lines.push(`      → ${issue.suggestion}`);
+    }
   }
 
   return lines.join("\n");
