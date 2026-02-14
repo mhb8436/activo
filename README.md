@@ -117,6 +117,20 @@ activo --resume
 }
 ```
 
+## 함께 사용하기
+
+activo는 단독으로도 품질 점검 도구로 충분합니다. 다만 **규칙 고정·배치 검사·Excel 리포트**가 필요한 경우 [Code Quality Checker (CQC)](https://github.com/mhb8436/code-quality-checker)와 함께 쓰면 효과적입니다.
+
+| 용도 | activo | CQC |
+|------|--------|-----|
+| 대화형 분석·설명 | ◎ | - |
+| 개발표준 RAG 검사 | ◎ | - |
+| 고정 규칙 배치 검사 | - | ◎ |
+| Excel 제출용 리포트 | - | ◎ |
+| 오프라인 단일 바이너리 | - | ◎ |
+
+activo로 개발표준 PDF를 MD로 변환·RAG 인덱싱한 뒤 점검하고, CQC로 조직 룰셋을 YAML로 정의해 CI·감사에 사용하는 구성이 가능합니다.
+
 ## 기술 스택
 
 - **Ollama** - 로컬 LLM
