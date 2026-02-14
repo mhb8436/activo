@@ -31,6 +31,7 @@ coverage/
 # Claude
 .claude/
 
-# Markdown (except README.md)
+# Markdown (except README.md, docs/)
 *.md
 !README.md
+!docs/*.md
