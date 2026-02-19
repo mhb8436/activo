@@ -6,6 +6,8 @@ AI 기반 코드 품질 분석 CLI (Ollama)
 
 Ollama를 활용한 대화형 코드 분석 에이전트. Java, TypeScript, Python, SQL, CSS 등 다국어·멀티스택 프로젝트를 자동 감지하고 품질 이슈를 분석합니다.
 
+> **[ACTIVO 소개자료 (PDF)](docs/ACTIVO_Secure_Code_Agent.pdf)** — 아키텍처, 분석 기능, 도입 효과를 한눈에 확인할 수 있습니다.
+
 - **Tool Calling**: LLM이 상황에 맞는 도구를 직접 호출
 - **MCP 지원**: Model Context Protocol 연동
 - **React Ink TUI**: 터미널용 대화형 UI
