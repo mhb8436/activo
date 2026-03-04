@@ -28,14 +28,18 @@ export const MessageList = React.memo(function MessageList({ messages }: Message
     );
   }
 
+  // Continue-style: completed messages → <Static> (rendered once, never re-rendered by Ink)
+  // Only the last message stays in the dynamic area (can update for streaming/tool calls)
   const stableCount = Math.max(0, messages.length - 1);
-  const staticMessages = messages.slice(0, stableCount);
+  const stableMessages = messages.slice(0, stableCount);
   const pendingMessages = messages.slice(stableCount);
 
   return (
     <Box flexDirection="column">
-      <Static items={staticMessages}>
-        {(message) => <MessageItem key={message.id} message={message} />}
+      <Static items={stableMessages}>
+        {(message) => (
+          <MessageItem key={message.id} message={message} />
+        )}
       </Static>
       {pendingMessages.map((message) => (
         <MessageItem key={message.id} message={message} />
@@ -49,20 +53,18 @@ const MessageItem = React.memo(function MessageItem({ message }: { message: Mess
 
   return (
     <Box flexDirection="column" marginY={1}>
-      {/* Role indicator */}
       <Box>
         <Text color={isUser ? "green" : "cyan"} bold>
           {isUser ? "You" : "ACTIVO"}
         </Text>
       </Box>
 
-      {/* Tool calls */}
       {message.toolCalls && message.toolCalls.length > 0 && (
         <Box flexDirection="column" marginLeft={2} marginY={1}>
           {message.toolCalls.map((tc, idx) => (
             <Box key={idx}>
               <Text color="gray">
-                {tc.status === "running" ? "🔄" : tc.status === "complete" ? "✓" : "✗"}{" "}
+                {tc.status === "running" ? "○" : tc.status === "complete" ? "●" : "✗"}{" "}
               </Text>
               <Text color={tc.status === "error" ? "red" : "yellow"}>{tc.tool}</Text>
               {tc.detail && (
@@ -76,7 +78,6 @@ const MessageItem = React.memo(function MessageItem({ message }: { message: Mess
         </Box>
       )}
 
-      {/* Content */}
       {message.content && (
         <Box marginLeft={2}>
           <Text wrap="wrap">{message.content}</Text>

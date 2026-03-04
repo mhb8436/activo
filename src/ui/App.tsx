@@ -70,6 +70,10 @@ export function App({ initialPrompt, config, resume }: AppProps): React.ReactEle
   const [exitPending, setExitPending] = useState(false);
   const [cancelled, setCancelled] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
+  const messagesRef = useRef<Message[]>([]);
+
+  // Keep messagesRef in sync with messages state
+  messagesRef.current = messages;
 
   // Session management
   const [session, setSession] = useState(() => createSession());
@@ -222,8 +226,8 @@ export function App({ initialPrompt, config, resume }: AppProps): React.ReactEle
     const userMessage: Message = { id: nextMessageId(), role: "user", content: text };
     setMessages((prev) => [...prev, userMessage]);
 
-    // Convert messages to chat format
-    const history: ChatMessage[] = messages.map((m) => ({
+    // Convert messages to chat format (use ref to avoid dependency on messages state)
+    const history: ChatMessage[] = messagesRef.current.map((m) => ({
       role: m.role,
       content: m.content,
     }));
@@ -341,12 +345,12 @@ export function App({ initialPrompt, config, resume }: AppProps): React.ReactEle
         return updatedSession;
       });
     }
-  }, [messages, client, config, isProcessing, contextSummary]);
+  }, [client, config, isProcessing, contextSummary]);
 
   return (
     <Box flexDirection="column" height="100%">
       {/* Messages */}
-      <Box flexDirection="column" flexGrow={1}>
+      <Box flexDirection="column" flexGrow={1} overflow="hidden">
         <MessageList messages={messages} />
       </Box>
 

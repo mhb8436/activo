@@ -1,6 +1,5 @@
 import React from "react";
 import { Box, Text } from "ink";
-import Spinner from "ink-spinner";
 
 interface ToolStatusProps {
   tool: string;
@@ -21,40 +20,18 @@ export function extractToolDetail(tool: string, args?: Record<string, unknown>):
 }
 
 export const ToolStatus = React.memo(function ToolStatus({ tool, status, detail }: ToolStatusProps): React.ReactElement {
+  const icon = status === "running" ? "⟳" : status === "complete" ? "✓" : "✗";
+  const iconColor = status === "running" ? "cyan" : status === "complete" ? "green" : "red";
+  const label = status === "running" ? "Using tool:" : status === "complete" ? "Tool completed:" : "Tool failed:";
+
   return (
-    <Box marginY={1} paddingX={1}>
-      {status === "running" ? (
-        <>
-          <Text color="cyan">
-            <Spinner type="dots" />
-          </Text>
-          <Text color="cyan"> Using tool: </Text>
-          <Text color="yellow" bold>
-            {tool}
-          </Text>
-          {detail && (
-            <Text color="gray"> ({detail})</Text>
-          )}
-        </>
-      ) : status === "complete" ? (
-        <>
-          <Text color="green">✓ </Text>
-          <Text color="gray">Tool completed: </Text>
-          <Text color="white">{tool}</Text>
-          {detail && (
-            <Text color="gray"> ({detail})</Text>
-          )}
-        </>
-      ) : (
-        <>
-          <Text color="red">✗ </Text>
-          <Text color="gray">Tool failed: </Text>
-          <Text color="red">{tool}</Text>
-          {detail && (
-            <Text color="gray"> ({detail})</Text>
-          )}
-        </>
-      )}
+    <Box paddingX={1}>
+      <Text color={iconColor}>{icon} </Text>
+      <Text color={status === "running" ? "cyan" : "gray"}>{label} </Text>
+      <Text color={status === "running" ? "yellow" : status === "error" ? "red" : "white"} bold={status === "running"}>
+        {tool}
+      </Text>
+      {detail && <Text color="gray"> ({detail})</Text>}
     </Box>
   );
 });

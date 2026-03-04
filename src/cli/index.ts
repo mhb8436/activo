@@ -71,7 +71,11 @@ program
         initialPrompt: prompt,
         config,
         resume: options.resume,
-      })
+      }),
+      {
+        exitOnCtrlC: false,
+        incrementalRendering: true,
+      }
     );
 
     await waitUntilExit();
