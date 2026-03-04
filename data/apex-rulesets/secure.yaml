@@ -1,0 +1,1688 @@
+# Secure Coding Guide Ruleset
+version: "1.0"
+profile: "secure"
+
+languages:
+  - language: java
+    rules:
+      # ==================== 1. 입력데이터 검증 및 표현 ====================
+
+      # 1.1 SQL 삽입
+      - id: "secure-sql-001"
+        name: "Statement 직접 사용 금지"
+        severity: "critical"
+        category: "sql-injection"
+        description: "createStatement() 사용은 SQL Injection에 취약합니다. PreparedStatement를 사용하세요."
+        enabled: true
+        pattern:
+          type: "ast-method-call"
+          method: "^createStatement$"
+        custom:
+          rule_id: "SEC-SQL-001"
+          fix: "PreparedStatement 사용"
+
+      - id: "secure-sql-002"
+        name: "문자열 연결 쿼리 금지"
+        severity: "critical"
+        category: "sql-injection"
+        description: "SQL 문자열 연결은 SQL Injection에 취약합니다."
+        enabled: true
+        pattern:
+          type: "ast-filtered-regex"
+          regex: "\"SELECT[^\"]*\"\\s*\\+|\"INSERT[^\"]*\"\\s*\\+|\"UPDATE[^\"]*\"\\s*\\+|\"DELETE[^\"]*\"\\s*\\+"
+        custom:
+          rule_id: "SEC-SQL-002"
+          fix: "PreparedStatement와 바인드 변수 사용"
+
+      - id: "secure-sql-003"
+        name: "MyBatis ${} 사용 금지"
+        severity: "critical"
+        category: "sql-injection"
+        description: "MyBatis에서 ${}는 SQL Injection에 취약합니다. #{}를 사용하세요."
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "\\$\\{[^}]+\\}"
+        file_extensions: ["xml"]
+        custom:
+          rule_id: "SEC-SQL-003"
+          fix: "#{} 사용"
+
+      # 1.2 코드 삽입
+      - id: "secure-code-001"
+        name: "ScriptEngine.eval() 사용 금지"
+        severity: "critical"
+        category: "code-injection"
+        description: "ScriptEngine.eval()로 외부 입력 실행은 코드 삽입 공격에 취약합니다."
+        enabled: true
+        pattern:
+          type: "ast-method-call"
+          method: "^eval$"
+          qualifier: "(?i)engine"
+        custom:
+          rule_id: "SEC-CODE-001"
+
+      - id: "secure-code-002"
+        name: "Runtime.exec() 외부입력 금지"
+        severity: "critical"
+        category: "code-injection"
+        description: "Runtime.exec()에 외부 입력값 사용은 명령어 삽입에 취약합니다."
+        enabled: false
+        pattern:
+          type: "regex"
+          regex: "Runtime\\.getRuntime\\(\\)\\.exec\\s*\\("
+        custom:
+          rule_id: "SEC-CODE-002"
+
+      - id: "secure-code-003"
+        name: "ProcessBuilder 외부입력 금지"
+        severity: "critical"
+        category: "code-injection"
+        description: "ProcessBuilder에 외부 입력값 사용은 명령어 삽입에 취약합니다."
+        enabled: false
+        pattern:
+          type: "regex"
+          regex: "new\\s+ProcessBuilder\\s*\\("
+        custom:
+          rule_id: "SEC-CODE-003"
+
+      # 1.3 경로 조작 및 자원 삽입
+      - id: "secure-path-001"
+        name: "파일 경로 외부입력 검증"
+        severity: "critical"
+        category: "path-traversal"
+        description: "외부 입력값을 파일 경로로 직접 사용하면 경로 조작 공격에 취약합니다."
+        enabled: true
+        pattern:
+          type: "ast-filtered-regex"
+          regex: "new\\s+File\\s*\\([^)]*request\\.getParameter"
+        custom:
+          rule_id: "SEC-PATH-001"
+
+      - id: "secure-path-002"
+        name: "경로순회 문자 검증 필수"
+        severity: "critical"
+        category: "path-traversal"
+        description: "파일 접근 시 경로순회 문자(..)를 검증해야 합니다."
+        enabled: true
+        pattern:
+          type: "method-analysis"
+          conditions:
+            - "file-access-without-path-validation"
+        custom:
+          rule_id: "SEC-PATH-002"
+
+      - id: "secure-path-003"
+        name: "정규화 경로 검증"
+        severity: "high"
+        category: "path-traversal"
+        description: "파일 접근 시 getCanonicalPath()로 경로를 정규화하여 검증해야 합니다."
+        enabled: true
+        pattern:
+          type: "method-analysis"
+          conditions:
+            - "file-access-without-canonical-path"
+        custom:
+          rule_id: "SEC-PATH-003"
+
+      # 1.4 크로스사이트 스크립트 (XSS)
+      - id: "secure-xss-001"
+        name: "출력값 인코딩 필수"
+        severity: "critical"
+        category: "xss"
+        description: "외부 입력값을 출력할 때 HTML 인코딩이 필요합니다."
+        enabled: true
+        pattern:
+          type: "ast-filtered-regex"
+          regex: "out\\.print(ln)?\\s*\\([^)]*request\\.getParameter"
+        custom:
+          rule_id: "SEC-XSS-001"
+
+      - id: "secure-xss-002"
+        name: "innerHTML 사용 주의"
+        severity: "critical"
+        category: "xss"
+        description: "innerHTML에 변수 할당은 XSS에 취약합니다."
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "\\.innerHTML\\s*="
+        file_extensions: ["js", "html", "jsp"]
+        custom:
+          rule_id: "SEC-XSS-002"
+
+      - id: "secure-xss-003"
+        name: "document.write 금지"
+        severity: "high"
+        category: "xss"
+        description: "document.write() 사용은 XSS에 취약합니다."
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "document\\.write\\s*\\("
+        file_extensions: ["js", "html", "jsp"]
+        custom:
+          rule_id: "SEC-XSS-003"
+
+      # 1.5 운영체제 명령어 삽입
+      - id: "secure-cmd-001"
+        name: "Runtime.exec 외부입력 금지"
+        severity: "critical"
+        category: "command-injection"
+        description: "외부 입력값을 명령어로 직접 실행하면 명령어 삽입에 취약합니다."
+        enabled: true
+        pattern:
+          type: "ast-filtered-regex"
+          regex: "Runtime\\.getRuntime\\(\\)\\.exec\\s*\\([^)]*\\+|Runtime\\.getRuntime\\(\\)\\.exec\\s*\\([^\"']"
+        custom:
+          rule_id: "SEC-CMD-001"
+
+      - id: "secure-cmd-002"
+        name: "ProcessBuilder 외부입력 금지"
+        severity: "critical"
+        category: "command-injection"
+        description: "ProcessBuilder에 외부 입력값 사용은 명령어 삽입에 취약합니다."
+        enabled: true
+        pattern:
+          type: "ast-filtered-regex"
+          regex: "new\\s+ProcessBuilder\\s*\\([^)]*\\+"
+        custom:
+          rule_id: "SEC-CMD-002"
+
+      # 1.6 위험한 형식 파일 업로드
+      - id: "secure-file-001"
+        name: "파일 확장자 검증 필수"
+        severity: "critical"
+        category: "file-upload"
+        description: "파일 업로드 시 확장자 검증이 필요합니다."
+        enabled: true
+        pattern:
+          type: "method-analysis"
+          conditions:
+            - "file-upload-without-extension-validation"
+        custom:
+          rule_id: "SEC-FILE-001"
+
+      - id: "secure-file-002"
+        name: "실행 파일 확장자 금지"
+        severity: "critical"
+        category: "file-upload"
+        description: "jsp, asp, php, exe 등 실행 파일 업로드를 금지해야 합니다."
+        enabled: true
+        pattern:
+          type: "method-analysis"
+          conditions:
+            - "executable-extension-allowed"
+        custom:
+          rule_id: "SEC-FILE-002"
+
+      # 1.7 신뢰되지 않는 URL 주소로 자동접속 연결
+      - id: "secure-redir-001"
+        name: "리다이렉트 URL 검증"
+        severity: "critical"
+        category: "open-redirect"
+        description: "외부 입력값으로 직접 리다이렉트하면 피싱 공격에 악용될 수 있습니다."
+        enabled: true
+        pattern:
+          type: "ast-filtered-regex"
+          regex: "response\\.sendRedirect\\s*\\([^)]*request\\.getParameter"
+        custom:
+          rule_id: "SEC-REDIR-001"
+
+      - id: "secure-redir-002"
+        name: "도메인 화이트리스트"
+        severity: "critical"
+        category: "open-redirect"
+        description: "리다이렉트 시 도메인 화이트리스트 검증이 필요합니다."
+        enabled: true
+        pattern:
+          type: "method-analysis"
+          conditions:
+            - "redirect-without-domain-validation"
+        custom:
+          rule_id: "SEC-REDIR-002"
+
+      # 1.8 부적절한 XML 외부개체 참조 (XXE)
+      - id: "secure-xxe-001"
+        name: "XML 외부엔티티 비활성화"
+        severity: "critical"
+        category: "xxe"
+        description: "DocumentBuilderFactory 사용 시 XXE 방지 설정이 필요합니다."
+        enabled: true
+        pattern:
+          type: "method-analysis"
+          conditions:
+            - "documentbuilderfactory-without-xxe-protection"
+        custom:
+          rule_id: "SEC-XXE-001"
+
+      - id: "secure-xxe-002"
+        name: "SAXParser XXE 설정"
+        severity: "critical"
+        category: "xxe"
+        description: "SAXParserFactory 사용 시 XXE 방지 설정이 필요합니다."
+        enabled: true
+        pattern:
+          type: "method-analysis"
+          conditions:
+            - "saxparserfactory-without-xxe-protection"
+        custom:
+          rule_id: "SEC-XXE-002"
+
+      # 1.9 XML 삽입 (XQuery/XPath)
+      - id: "secure-xpath-001"
+        name: "XPath 외부입력 검증"
+        severity: "critical"
+        category: "xpath-injection"
+        description: "XPath 쿼리에 외부 입력값 직접 사용은 XPath 삽입에 취약합니다."
+        enabled: true
+        pattern:
+          type: "ast-filtered-regex"
+          regex: "xpath\\.evaluate\\s*\\([^)]*\\+"
+        custom:
+          rule_id: "SEC-XPATH-001"
+
+      - id: "secure-xquery-001"
+        name: "XQuery 외부입력 검증"
+        severity: "critical"
+        category: "xquery-injection"
+        description: "XQuery에 외부 입력값 직접 사용은 XQuery 삽입에 취약합니다."
+        enabled: true
+        pattern:
+          type: "ast-filtered-regex"
+          regex: "executeQuery\\s*\\([^)]*\\+"
+        custom:
+          rule_id: "SEC-XQUERY-001"
+
+      # 1.10 LDAP 삽입
+      - id: "secure-ldap-001"
+        name: "LDAP 필터 외부입력 검증"
+        severity: "critical"
+        category: "ldap-injection"
+        description: "LDAP 필터에 외부 입력값 직접 사용은 LDAP 삽입에 취약합니다."
+        enabled: true
+        pattern:
+          type: "ast-filtered-regex"
+          regex: "\\(\\s*&\\s*\\([^)]*=.*\\+|search\\s*\\([^)]*\\+"
+        custom:
+          rule_id: "SEC-LDAP-001"
+
+      # 1.11 크로스사이트 요청 위조 (CSRF)
+      - id: "secure-csrf-001"
+        name: "CSRF 토큰 검증 필수"
+        severity: "medium"
+        category: "csrf"
+        description: "POST 요청 처리 시 CSRF 토큰 검증이 필요합니다. Spring Security CsrfFilter 사용 시 Controller 레벨 검증은 불필요."
+        enabled: true
+        pattern:
+          type: "method-analysis"
+          conditions:
+            - "post-handler-without-csrf-token"
+        custom:
+          rule_id: "SEC-CSRF-001"
+
+      - id: "secure-csrf-002"
+        name: "중요 기능 재인증"
+        severity: "high"
+        category: "csrf"
+        description: "계좌이체, 비밀번호 변경 시 재인증이 필요합니다."
+        enabled: true
+        pattern:
+          type: "method-analysis"
+          conditions:
+            - "sensitive-operation-without-reauth"
+        custom:
+          rule_id: "SEC-CSRF-002"
+
+      # 1.12 서버사이드 요청 위조 (SSRF)
+      - id: "secure-ssrf-001"
+        name: "URL 외부입력 검증"
+        severity: "critical"
+        category: "ssrf"
+        description: "외부 입력값으로 URL 접근은 SSRF 공격에 취약합니다."
+        enabled: true
+        pattern:
+          type: "ast-filtered-regex"
+          regex: "new\\s+URL\\s*\\([^)]*request\\.getParameter"
+        custom:
+          rule_id: "SEC-SSRF-001"
+
+      - id: "secure-ssrf-002"
+        name: "내부망 접근 차단"
+        severity: "critical"
+        category: "ssrf"
+        description: "내부망 IP 접근 차단 검증이 필요합니다."
+        enabled: true
+        pattern:
+          type: "method-analysis"
+          conditions:
+            - "url-access-without-internal-ip-check"
+        custom:
+          rule_id: "SEC-SSRF-002"
+
+      # 1.13 HTTP 응답분할
+      - id: "secure-http-001"
+        name: "헤더 개행문자 검증"
+        severity: "critical"
+        category: "http-response-splitting"
+        description: "HTTP 응답 헤더에 개행문자가 포함되면 응답분할 공격에 취약합니다."
+        enabled: true
+        pattern:
+          type: "method-analysis"
+          conditions:
+            - "header-value-without-crlf-validation"
+        custom:
+          rule_id: "SEC-HTTP-001"
+
+      # 1.14 정수형 오버플로우
+      - id: "secure-int-001"
+        name: "배열 크기 검증"
+        severity: "high"
+        category: "integer-overflow"
+        description: "외부 입력값을 배열 크기로 사용할 때 범위 검증이 필요합니다."
+        enabled: true
+        pattern:
+          type: "ast-filtered-regex"
+          regex: "new\\s+\\w+\\s*\\[\\s*[^\\]]*parseInt|new\\s+\\w+\\s*\\[\\s*[^\\]]*getParameter"
+        custom:
+          rule_id: "SEC-INT-001"
+
+      # 1.15 보안기능 결정에 사용되는 부적절한 입력값
+      - id: "secure-input-001"
+        name: "가격/권한 서버 조회"
+        severity: "critical"
+        category: "insecure-input"
+        description: "결제 금액, 사용자 권한을 클라이언트에서 받으면 조작 위험이 있습니다."
+        enabled: true
+        pattern:
+          type: "method-analysis"
+          conditions:
+            - "price-or-permission-from-client"
+        custom:
+          rule_id: "SEC-INPUT-001"
+
+      - id: "secure-input-002"
+        name: "히든필드 신뢰 금지"
+        severity: "critical"
+        category: "insecure-input"
+        description: "hidden 필드 값으로 보안결정을 하면 조작 위험이 있습니다."
+        enabled: true
+        pattern:
+          type: "method-analysis"
+          conditions:
+            - "security-decision-from-hidden-field"
+        custom:
+          rule_id: "SEC-INPUT-002"
+
+      # 1.16 메모리 버퍼 오버플로우 (C/C++ 관련 - Java에서는 참조용)
+      - id: "secure-buf-001"
+        name: "안전한 문자열 함수 사용"
+        severity: "critical"
+        category: "buffer-overflow"
+        description: "strcpy, strcat, gets, sprintf는 버퍼 오버플로우에 취약합니다."
+        enabled: false
+        pattern:
+          type: "regex"
+          regex: "\\b(strcpy|strcat|gets|sprintf)\\s*\\("
+        custom:
+          rule_id: "SEC-BUF-001"
+          note: "C/C++ 전용 규칙"
+
+      # 1.17 포맷 스트링 삽입
+      - id: "secure-fmt-001"
+        name: "포맷 스트링 외부입력 금지"
+        severity: "critical"
+        category: "format-string"
+        description: "String.format()에 외부 입력값을 직접 사용하면 포맷 스트링 공격에 취약합니다."
+        enabled: true
+        pattern:
+          type: "ast-filtered-regex"
+          regex: "String\\.format\\s*\\([^,)]*request\\.getParameter"
+        custom:
+          rule_id: "SEC-FMT-001"
+
+      # 1.18 입력데이터 검증 누락 (CWE-20)
+
+      - id: "secure-valid-001"
+        name: "@RequestBody 입력 검증 누락"
+        severity: "medium"
+        category: "input-validation"
+        description: "@RequestBody로 VO/DTO 객체를 바인딩할 때 @Valid 어노테이션이 없으면 입력값 검증이 수행되지 않습니다. Map<String,Object> 타입은 제외합니다."
+        enabled: true
+        tags:
+          - "CWE-20"
+          - "input-validation"
+        pattern:
+          type: "regex"
+          regex: "@RequestBody\\s+(?!@Valid\\b)(?!Map\\b)(?!HashMap\\b)(?!LinkedHashMap\\b)(?!List\\b)(?!Set\\b)(?!Collection\\b)(?!String\\b)[A-Z]\\w+"
+        custom:
+          rule_id: "SEC-VALID-001"
+          fix: "@Valid @RequestBody MyVO vo 형태로 @Valid를 추가하세요"
+
+      - id: "secure-valid-002"
+        name: "@ModelAttribute 입력 검증 누락"
+        severity: "low"
+        category: "input-validation"
+        description: "@ModelAttribute로 VO 객체를 바인딩할 때 @Valid 어노테이션이 없으면 폼 입력값 검증이 수행되지 않습니다."
+        enabled: true
+        tags:
+          - "CWE-20"
+          - "input-validation"
+        pattern:
+          type: "regex"
+          regex: "@ModelAttribute\\s+(?!@Valid\\b)[A-Z]\\w+"
+        custom:
+          rule_id: "SEC-VALID-002"
+          fix: "@Valid @ModelAttribute MyVO vo 형태로 @Valid를 추가하세요"
+
+      # ==================== 2. 보안기능 ====================
+
+      # 2.1 적절한 인증 없는 중요기능 허용
+      - id: "secure-auth-001"
+        name: "중요기능 인증 필수"
+        severity: "critical"
+        category: "authentication"
+        description: "회원정보 수정, 결제 시 세션 검증이 필요합니다."
+        enabled: true
+        pattern:
+          type: "method-analysis"
+          conditions:
+            - "sensitive-function-without-auth-check"
+        custom:
+          rule_id: "SEC-AUTH-001"
+
+      - id: "secure-auth-002"
+        name: "재인증 필요"
+        severity: "critical"
+        category: "authentication"
+        description: "비밀번호 변경, 계좌이체 시 재인증이 필요합니다."
+        enabled: true
+        pattern:
+          type: "method-analysis"
+          conditions:
+            - "password-change-without-reauth"
+        custom:
+          rule_id: "SEC-AUTH-002"
+
+      # 2.2 부적절한 인가
+      - id: "secure-authz-001"
+        name: "자원 접근 권한 검증"
+        severity: "high"
+        category: "authorization"
+        description: "삭제, 수정 시 권한 검증이 필요합니다. SecurityFilterChain에서 URL 패턴별로 처리 가능합니다."
+        enabled: true
+        pattern:
+          type: "method-analysis"
+          conditions:
+            - "resource-modification-without-authz"
+        custom:
+          rule_id: "SEC-AUTHZ-001"
+
+      - id: "secure-authz-002"
+        name: "관리자 기능 보호"
+        severity: "low"
+        category: "authorization"
+        description: "관리자 URL 접근 권한 검증이 필요합니다. (참고: JSP 앱에서는 SecurityFilterChain 설정이 우선)"
+        enabled: true
+        pattern:
+          type: "method-analysis"
+          conditions:
+            - "admin-function-without-role-check"
+        custom:
+          rule_id: "SEC-AUTHZ-002"
+
+      # 2.3 중요한 자원에 대한 잘못된 권한 설정
+      - id: "secure-perm-001"
+        name: "파일 권한 최소화"
+        severity: "critical"
+        category: "permission"
+        description: "setWritable(true, false)는 모든 사용자에게 쓰기 권한을 부여합니다."
+        enabled: true
+        pattern:
+          type: "ast-filtered-regex"
+          regex: "setWritable\\s*\\(\\s*true\\s*,\\s*false\\s*\\)"
+        custom:
+          rule_id: "SEC-PERM-001"
+
+      - id: "secure-perm-002"
+        name: "파일 권한 전체 공개"
+        severity: "critical"
+        category: "permission"
+        description: "setReadable(true, false)는 모든 사용자에게 읽기 권한을 부여합니다."
+        enabled: true
+        pattern:
+          type: "ast-filtered-regex"
+          regex: "setReadable\\s*\\(\\s*true\\s*,\\s*false\\s*\\)"
+        custom:
+          rule_id: "SEC-PERM-002"
+
+      # 2.4 취약한 암호화 알고리즘 사용
+      - id: "secure-crypto-001"
+        name: "DES 사용 금지"
+        severity: "critical"
+        category: "weak-crypto"
+        description: "DES는 취약한 암호화 알고리즘입니다. AES를 사용하세요."
+        enabled: true
+        pattern:
+          type: "ast-filtered-regex"
+          regex: "Cipher\\.getInstance\\s*\\(\\s*[\"']DES[\"']"
+        custom:
+          rule_id: "SEC-CRYPTO-001"
+          fix: "AES/GCM/NoPadding 사용"
+
+      - id: "secure-crypto-002"
+        name: "MD5 사용 금지"
+        severity: "critical"
+        category: "weak-crypto"
+        description: "MD5는 취약한 해시 알고리즘입니다. SHA-256 이상을 사용하세요."
+        enabled: true
+        pattern:
+          type: "ast-filtered-regex"
+          regex: "MessageDigest\\.getInstance\\s*\\(\\s*[\"']MD5[\"']"
+        custom:
+          rule_id: "SEC-CRYPTO-002"
+          fix: "SHA-256 이상 사용"
+
+      - id: "secure-crypto-003"
+        name: "SHA1 사용 금지"
+        severity: "high"
+        category: "weak-crypto"
+        description: "SHA-1은 취약한 해시 알고리즘입니다. SHA-256 이상을 사용하세요."
+        enabled: true
+        pattern:
+          type: "ast-filtered-regex"
+          regex: "MessageDigest\\.getInstance\\s*\\(\\s*[\"']SHA-?1[\"']"
+        custom:
+          rule_id: "SEC-CRYPTO-003"
+          fix: "SHA-256 이상 사용"
+
+      - id: "secure-crypto-004"
+        name: "RC4 사용 금지"
+        severity: "critical"
+        category: "weak-crypto"
+        description: "RC4는 취약한 암호화 알고리즘입니다."
+        enabled: true
+        pattern:
+          type: "ast-filtered-regex"
+          regex: "Cipher\\.getInstance\\s*\\(\\s*[\"']RC4[\"']"
+        custom:
+          rule_id: "SEC-CRYPTO-004"
+
+      # 2.5 중요정보 평문저장/전송
+      - id: "secure-plain-001"
+        name: "비밀번호 평문 저장 금지"
+        severity: "critical"
+        category: "plaintext-storage"
+        description: "비밀번호는 해시하여 저장해야 합니다."
+        enabled: true
+        pattern:
+          type: "method-analysis"
+          conditions:
+            - "password-stored-plaintext"
+        custom:
+          rule_id: "SEC-PLAIN-001"
+
+      - id: "secure-plain-002"
+        name: "중요정보 암호화 전송"
+        severity: "critical"
+        category: "plaintext-transmission"
+        description: "비밀번호, 카드번호는 암호화하여 전송해야 합니다."
+        enabled: true
+        pattern:
+          type: "method-analysis"
+          conditions:
+            - "sensitive-data-plaintext-transmission"
+        custom:
+          rule_id: "SEC-PLAIN-002"
+
+      - id: "secure-plain-003"
+        name: "쿠키 보안속성 미설정"
+        severity: "high"
+        category: "cookie-security"
+        description: "쿠키 생성 시 setSecure(true)를 설정해야 합니다."
+        enabled: true
+        pattern:
+          type: "ast-filtered-regex"
+          regex: "new\\s+Cookie\\s*\\([^)]+\\)(?![^;]*setSecure\\s*\\(\\s*true)"
+        custom:
+          rule_id: "SEC-PLAIN-003"
+
+      # 2.6 하드코드된 중요정보
+      - id: "secure-hard-001"
+        name: "하드코드된 비밀번호"
+        severity: "critical"
+        category: "hardcoded-credentials"
+        description: "비밀번호를 소스코드에 하드코딩하면 안 됩니다."
+        enabled: false
+        pattern:
+          type: "regex"
+          regex: "(password|passwd|pwd)\\s*=\\s*[\"'][^\"']+[\"']"
+          flags: "i"
+        custom:
+          rule_id: "SEC-HARD-001"
+
+      - id: "secure-hard-002"
+        name: "하드코드된 암호화 키"
+        severity: "critical"
+        category: "hardcoded-credentials"
+        description: "암호화 키를 소스코드에 하드코딩하면 안 됩니다."
+        enabled: true
+        pattern:
+          type: "ast-filtered-regex"
+          regex: "(secret|secretKey|SECRET_KEY|encryptKey|ENCRYPT_KEY)\\s*=\\s*[\"'][^\"']+[\"']"
+        custom:
+          rule_id: "SEC-HARD-002"
+
+      - id: "secure-hard-003"
+        name: "하드코드된 DB 접속정보"
+        severity: "critical"
+        category: "hardcoded-credentials"
+        description: "DB 접속정보를 소스코드에 하드코딩하면 안 됩니다."
+        enabled: true
+        pattern:
+          type: "ast-filtered-regex"
+          regex: "DriverManager\\.getConnection\\s*\\([^)]*[\"'][^\"']+[\"']\\s*,\\s*[\"'][^\"']+[\"']\\s*,\\s*[\"'][^\"']+[\"']"
+        custom:
+          rule_id: "SEC-HARD-003"
+
+      # 2.7 충분하지 않은 키 길이 사용
+      - id: "secure-key-001"
+        name: "RSA 키 길이 2048 이상"
+        severity: "critical"
+        category: "weak-key"
+        description: "RSA 키는 최소 2048비트 이상이어야 합니다."
+        enabled: true
+        pattern:
+          type: "ast-filtered-regex"
+          regex: "keyGen\\.initialize\\s*\\(\\s*(512|768|1024)\\s*\\)"
+        custom:
+          rule_id: "SEC-KEY-001"
+          min_length: "2048"
+
+      - id: "secure-key-002"
+        name: "AES 키 길이 128 이상"
+        severity: "critical"
+        category: "weak-key"
+        description: "AES 키는 최소 128비트 이상이어야 합니다."
+        enabled: true
+        pattern:
+          type: "ast-filtered-regex"
+          regex: "keyGen\\.init\\s*\\(\\s*(56|64)\\s*\\)"
+        custom:
+          rule_id: "SEC-KEY-002"
+          min_length: "128"
+
+      # 2.8 적절하지 않은 난수값 사용
+      - id: "secure-rand-001"
+        name: "세션ID 생성 시 SecureRandom 사용"
+        severity: "critical"
+        category: "weak-random"
+        description: "세션ID, 토큰 생성 시 SecureRandom을 사용해야 합니다."
+        enabled: true
+        pattern:
+          type: "ast-filtered-regex"
+          regex: "new\\s+Random\\s*\\(\\s*\\)[^;]*session|new\\s+Random\\s*\\(\\s*\\)[^;]*token"
+        custom:
+          rule_id: "SEC-RAND-001"
+          fix: "SecureRandom 사용"
+          flags: "i"
+
+      - id: "secure-rand-002"
+        name: "암호화 키 생성 시 SecureRandom 사용"
+        severity: "critical"
+        category: "weak-random"
+        description: "암호화 키 생성 시 Math.random()을 사용하면 안 됩니다."
+        enabled: true
+        pattern:
+          type: "ast-filtered-regex"
+          regex: "Math\\.random\\s*\\(\\s*\\)[^;]*key"
+        custom:
+          rule_id: "SEC-RAND-002"
+          flags: "i"
+
+      # 2.9 취약한 비밀번호 허용
+      - id: "secure-pwd-001"
+        name: "비밀번호 복잡도 검증"
+        severity: "high"
+        category: "weak-password"
+        description: "비밀번호 설정 시 복잡도 검증이 필요합니다."
+        enabled: true
+        pattern:
+          type: "method-analysis"
+          conditions:
+            - "password-set-without-complexity-check"
+        custom:
+          rule_id: "SEC-PWD-001"
+
+      - id: "secure-pwd-002"
+        name: "비밀번호 최소 길이"
+        severity: "high"
+        category: "weak-password"
+        description: "비밀번호는 최소 8자 이상이어야 합니다."
+        enabled: true
+        pattern:
+          type: "method-analysis"
+          conditions:
+            - "password-length-less-than-8"
+        custom:
+          rule_id: "SEC-PWD-002"
+
+      # 2.10 부적절한 전자서명 확인
+      - id: "secure-sign-001"
+        name: "JAR 서명 검증"
+        severity: "high"
+        category: "signature-verification"
+        description: "JarFile 사용 시 서명 검증이 필요합니다."
+        enabled: true
+        pattern:
+          type: "method-analysis"
+          conditions:
+            - "jarfile-without-signature-verification"
+        custom:
+          rule_id: "SEC-SIGN-001"
+
+      # 2.11 부적절한 인증서 유효성 검증
+      - id: "secure-cert-001"
+        name: "SSL 인증서 검증"
+        severity: "critical"
+        category: "certificate-validation"
+        description: "TrustManager에서 모든 인증서를 허용하면 안 됩니다."
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "X509TrustManager[^}]*checkServerTrusted[^}]*\\{\\s*\\}"
+        custom:
+          rule_id: "SEC-CERT-001"
+
+      - id: "secure-cert-002"
+        name: "호스트명 검증"
+        severity: "critical"
+        category: "certificate-validation"
+        description: "HostnameVerifier에서 모든 호스트를 허용하면 안 됩니다."
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "HostnameVerifier[^}]*verify[^}]*return\\s+true"
+        custom:
+          rule_id: "SEC-CERT-002"
+
+      # 2.12 쿠키 보안
+      - id: "secure-cookie-001"
+        name: "쿠키 만료시간 제한"
+        severity: "low"
+        category: "cookie-security"
+        description: "쿠키 만료시간은 최소한으로 설정해야 합니다."
+        enabled: true
+        pattern:
+          type: "ast-filtered-regex"
+          regex: "setMaxAge\\s*\\(\\s*\\d{5,}\\s*\\)"
+        custom:
+          rule_id: "SEC-COOKIE-001"
+          max_age: "3600"
+
+      - id: "secure-cookie-002"
+        name: "쿠키 Secure 속성"
+        severity: "high"
+        category: "cookie-security"
+        description: "중요 정보 쿠키는 setSecure(true)를 설정해야 합니다."
+        enabled: true
+        pattern:
+          type: "ast-filtered-regex"
+          regex: "setSecure\\s*\\(\\s*false\\s*\\)"
+        custom:
+          rule_id: "SEC-COOKIE-002"
+
+      - id: "secure-cookie-003"
+        name: "쿠키 HttpOnly 속성"
+        severity: "high"
+        category: "cookie-security"
+        description: "세션 쿠키는 setHttpOnly(true)를 설정해야 합니다."
+        enabled: true
+        pattern:
+          type: "ast-filtered-regex"
+          regex: "setHttpOnly\\s*\\(\\s*false\\s*\\)"
+        custom:
+          rule_id: "SEC-COOKIE-003"
+
+      # 2.13 주석문 안에 포함된 시스템 주요정보
+      - id: "secure-comment-001"
+        name: "주석 내 비밀번호 금지"
+        severity: "critical"
+        category: "info-exposure"
+        description: "주석에 비밀번호 정보를 포함하면 안 됩니다."
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "//[^\\n]*(password|pwd|비밀번호)[^\\n]*[:=][^\\n]*\\w+"
+          flags: "i"
+        custom:
+          rule_id: "SEC-COMMENT-001"
+
+      - id: "secure-comment-002"
+        name: "주석 내 계정정보 금지"
+        severity: "critical"
+        category: "info-exposure"
+        description: "주석에 계정정보를 포함하면 안 됩니다."
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "/\\*[^*]*\\*+([^/*][^*]*\\*+)*(admin|root)[^*]*(password|pwd)"
+          flags: "i"
+        custom:
+          rule_id: "SEC-COMMENT-002"
+
+      # 2.14 솔트 없이 일방향 해쉬함수 사용
+      - id: "secure-hash-001"
+        name: "비밀번호 해시 시 솔트 사용"
+        severity: "critical"
+        category: "weak-hash"
+        description: "비밀번호 해시 시 솔트를 사용해야 합니다."
+        enabled: true
+        pattern:
+          type: "method-analysis"
+          conditions:
+            - "password-hash-without-salt"
+        custom:
+          rule_id: "SEC-HASH-001"
+
+      # 2.15 무결성 검사 없는 코드 다운로드
+      - id: "secure-dl-001"
+        name: "다운로드 코드 무결성 검증"
+        severity: "critical"
+        category: "code-integrity"
+        description: "URLClassLoader 사용 시 체크섬 검증이 필요합니다."
+        enabled: true
+        pattern:
+          type: "ast-filtered-regex"
+          regex: "new\\s+URLClassLoader\\s*\\("
+        custom:
+          rule_id: "SEC-DL-001"
+
+      # 2.16 반복된 인증시도 제한 기능 부재
+      - id: "secure-brute-001"
+        name: "로그인 시도 횟수 제한"
+        severity: "critical"
+        category: "brute-force"
+        description: "로그인 실패 시 시도 횟수 제한/계정 잠금이 필요합니다."
+        enabled: true
+        pattern:
+          type: "method-analysis"
+          conditions:
+            - "login-without-attempt-limit"
+        custom:
+          rule_id: "SEC-BRUTE-001"
+
+      # ==================== 3. 시간 및 상태 ====================
+
+      - id: "secure-race-001"
+        name: "공유자원 동기화"
+        severity: "high"
+        category: "race-condition"
+        description: "멀티스레드 환경에서 공유자원 접근 시 synchronized가 필요합니다."
+        enabled: true
+        pattern:
+          type: "method-analysis"
+          conditions:
+            - "shared-resource-without-synchronization"
+        custom:
+          rule_id: "SEC-RACE-001"
+
+      # ==================== 4. 에러처리 ====================
+
+      - id: "secure-err-001"
+        name: "printStackTrace 금지"
+        severity: "high"
+        category: "error-handling"
+        description: "printStackTrace()는 시스템 정보를 노출할 수 있습니다."
+        enabled: true
+        pattern:
+          type: "method-analysis"
+          conditions:
+            - "print-stack-trace-prohibited"
+        custom:
+          rule_id: "SEC-ERR-001"
+          fix: "로거 사용"
+
+      - id: "secure-err-002"
+        name: "예외 메시지 노출 금지"
+        severity: "high"
+        category: "error-handling"
+        description: "e.getMessage()를 응답에 직접 포함하면 정보가 노출됩니다."
+        enabled: true
+        pattern:
+          type: "ast-filtered-regex"
+          regex: "(response|out)\\.[^;]*getMessage\\s*\\(\\s*\\)"
+        custom:
+          rule_id: "SEC-ERR-002"
+
+      - id: "secure-err-003"
+        name: "스택 트레이스 노출 금지"
+        severity: "high"
+        category: "error-handling"
+        description: "스택 트레이스를 응답에 포함하면 시스템 정보가 노출됩니다."
+        enabled: true
+        pattern:
+          type: "ast-filtered-regex"
+          regex: "(response|out)\\.[^;]*getStackTrace\\s*\\(\\s*\\)"
+        custom:
+          rule_id: "SEC-ERR-003"
+
+      - id: "secure-err-005"
+        name: "광범위한 Exception 처리 지양"
+        severity: "low"
+        category: "error-handling"
+        description: "Exception을 직접 catch하는 것보다 구체적인 예외를 처리하세요."
+        enabled: true
+        pattern:
+          type: "ast-filtered-regex"
+          regex: "catch\\s*\\(\\s*Exception\\s+\\w+\\s*\\)"
+        custom:
+          rule_id: "SEC-ERR-005"
+
+      # ==================== 5. 코드오류 ====================
+
+      - id: "secure-npe-001"
+        name: "Null 검사 필수"
+        severity: "high"
+        category: "null-pointer"
+        description: "request.getParameter() 결과는 null 검사가 필요합니다."
+        enabled: true
+        pattern:
+          type: "method-analysis"
+          conditions:
+            - "getparameter-without-null-check"
+        custom:
+          rule_id: "SEC-NPE-001"
+
+      - id: "secure-res-001"
+        name: "자원 해제 필수"
+        severity: "high"
+        category: "resource-leak"
+        description: "InputStream, Connection 등은 close()를 호출해야 합니다."
+        enabled: true
+        pattern:
+          type: "method-analysis"
+          conditions:
+            - "resource-without-close"
+        custom:
+          rule_id: "SEC-RES-001"
+
+      - id: "secure-res-002"
+        name: "try-with-resources 권장"
+        severity: "low"
+        category: "resource-leak"
+        description: "자원 관리에 try-with-resources 사용을 권장합니다."
+        enabled: true
+        pattern:
+          type: "method-analysis"
+          conditions:
+            - "resource-without-try-with-resources"
+        custom:
+          rule_id: "SEC-RES-002"
+
+      - id: "secure-deser-001"
+        name: "역직렬화 검증"
+        severity: "critical"
+        category: "deserialization"
+        description: "ObjectInputStream.readObject() 사용 시 검증이 필요합니다."
+        enabled: true
+        pattern:
+          type: "ast-method-call"
+          method: "^readObject$"
+        custom:
+          rule_id: "SEC-DESER-001"
+
+      # ==================== 6. 캡슐화 ====================
+
+      - id: "secure-session-001"
+        name: "Controller 멤버 변수 금지"
+        severity: "critical"
+        category: "encapsulation"
+        description: "@Controller 클래스에 멤버 필드 선언은 세션 간 데이터 공유 위험이 있습니다."
+        enabled: false
+        pattern:
+          type: "regex"
+          regex: "@Controller[^{]*\\{[^}]*private\\s+(?!static|final)[^;]+;"
+        custom:
+          rule_id: "SEC-SESSION-001"
+
+      - id: "secure-session-002"
+        name: "Servlet 멤버 변수 금지"
+        severity: "critical"
+        category: "encapsulation"
+        description: "Servlet 클래스에 멤버 필드 선언은 스레드 안전 문제를 유발합니다."
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "extends\\s+HttpServlet[^{]*\\{[^}]*private\\s+(?!static|final)[^;]+;"
+        custom:
+          rule_id: "SEC-SESSION-002"
+
+      - id: "secure-array-001"
+        name: "private 배열 직접 반환 금지"
+        severity: "low"
+        category: "encapsulation"
+        description: "private 배열을 직접 반환하면 외부에서 수정할 수 있습니다. VO/DTO 클래스는 제외됩니다."
+        enabled: true
+        pattern:
+          type: "method-analysis"
+          conditions:
+            - "private-array-direct-return"
+        custom:
+          rule_id: "SEC-ARRAY-001"
+
+      - id: "secure-array-002"
+        name: "외부 배열 직접 할당 금지"
+        severity: "low"
+        category: "encapsulation"
+        description: "외부 배열을 private 필드에 직접 할당하면 외부에서 수정할 수 있습니다. VO/DTO 클래스는 제외됩니다."
+        enabled: true
+        pattern:
+          type: "method-analysis"
+          conditions:
+            - "external-array-direct-assign"
+        custom:
+          rule_id: "SEC-ARRAY-002"
+
+      # ==================== 7. API 오용 ====================
+
+      - id: "secure-dns-001"
+        name: "DNS 기반 보안결정 금지"
+        severity: "high"
+        category: "api-misuse"
+        description: "getRemoteHost() 결과로 보안결정을 하면 DNS 스푸핑에 취약합니다."
+        enabled: true
+        pattern:
+          type: "ast-method-call"
+          method: "^getRemoteHost$"
+        custom:
+          rule_id: "SEC-DNS-001"
+
+      - id: "secure-api-001"
+        name: "System.exit() 금지"
+        severity: "critical"
+        category: "api-misuse"
+        description: "System.exit()는 웹 애플리케이션에서 사용하면 안 됩니다."
+        enabled: true
+        pattern:
+          type: "ast-method-call"
+          method: "^exit$"
+          qualifier: "^System$"
+        custom:
+          rule_id: "SEC-API-001"
+
+      # ==================== CODE-RAY 갭 분석 추가 규칙 ====================
+
+      # ---- 신규 1: 잔존하는 디버그 코드 (CWE-489) ----
+      - id: "secure-debug-001"
+        name: "디버그 출력문 잔존"
+        severity: "high"
+        category: "debug-code"
+        description: "System.out/err.print 문은 운영 환경에서 제거해야 합니다."
+        enabled: true
+        pattern:
+          type: "ast-filtered-regex"
+          regex: "System\\.(out|err)\\.(print|println|printf)\\s*\\("
+        custom:
+          rule_id: "SEC-DEBUG-001"
+          cwe: "CWE-489"
+          fix: "Logger를 사용하세요"
+
+      - id: "secure-debug-002"
+        name: "디버그 플래그 하드코딩"
+        severity: "medium"
+        category: "debug-code"
+        description: "디버그 모드 플래그가 true로 하드코딩되어 있습니다."
+        enabled: true
+        pattern:
+          type: "ast-filtered-regex"
+          regex: "(DEBUG|debugMode|isDebug|debug_mode)\\s*=\\s*true"
+        custom:
+          rule_id: "SEC-DEBUG-002"
+          cwe: "CWE-489"
+          fix: "운영 배포 시 false로 변경하거나 설정 파일로 분리하세요"
+
+      # ---- 신규 2: 취약 API 사용 확대 (CWE-676) ----
+      - id: "secure-api-002"
+        name: "Thread.stop() 사용 금지"
+        severity: "critical"
+        category: "api-misuse"
+        description: "Thread.stop()은 deprecated이며 데이터 무결성을 훼손할 수 있습니다."
+        enabled: true
+        pattern:
+          type: "ast-filtered-regex"
+          regex: "\\.stop\\s*\\(\\s*\\)"
+        custom:
+          rule_id: "SEC-API-002"
+          cwe: "CWE-676"
+          fix: "interrupt()와 volatile 플래그를 사용하세요"
+
+      - id: "secure-api-003"
+        name: "Thread.suspend/resume() 사용 금지"
+        severity: "critical"
+        category: "api-misuse"
+        description: "Thread.suspend()/resume()은 교착상태를 유발할 수 있습니다."
+        enabled: true
+        pattern:
+          type: "ast-filtered-regex"
+          regex: "\\.(suspend|resume)\\s*\\(\\s*\\)"
+        custom:
+          rule_id: "SEC-API-003"
+          cwe: "CWE-676"
+          fix: "wait()/notify() 또는 Lock/Condition을 사용하세요"
+
+      - id: "secure-api-004"
+        name: "Runtime.halt() 사용 금지"
+        severity: "critical"
+        category: "api-misuse"
+        description: "Runtime.halt()는 shutdown hook을 실행하지 않으므로 위험합니다."
+        enabled: true
+        pattern:
+          type: "ast-filtered-regex"
+          regex: "Runtime\\.getRuntime\\(\\)\\.halt\\s*\\("
+        custom:
+          rule_id: "SEC-API-004"
+          cwe: "CWE-676"
+
+      - id: "secure-api-005"
+        name: "runFinalizersOnExit 사용 금지"
+        severity: "critical"
+        category: "api-misuse"
+        description: "System.runFinalizersOnExit()은 deprecated이며 위험합니다."
+        enabled: true
+        pattern:
+          type: "ast-filtered-regex"
+          regex: "System\\.runFinalizersOnExit\\s*\\("
+        custom:
+          rule_id: "SEC-API-005"
+          cwe: "CWE-676"
+
+      - id: "secure-api-006"
+        name: "Thread.destroy() 사용 금지"
+        severity: "critical"
+        category: "api-misuse"
+        description: "Thread.destroy()는 deprecated이며 교착상태를 유발합니다."
+        enabled: true
+        pattern:
+          type: "ast-filtered-regex"
+          regex: "\\.destroy\\s*\\(\\s*\\)"
+        custom:
+          rule_id: "SEC-API-006"
+          cwe: "CWE-676"
+
+      # ---- 신규 3: 역직렬화 검증 확대 (CWE-502) ----
+      - id: "secure-deser-002"
+        name: "Jackson enableDefaultTyping 금지"
+        severity: "critical"
+        category: "deserialization"
+        description: "ObjectMapper.enableDefaultTyping()은 임의 클래스 역직렬화를 허용합니다."
+        enabled: true
+        pattern:
+          type: "ast-filtered-regex"
+          regex: "\\.(enableDefaultTyping|activateDefaultTyping)\\s*\\("
+        custom:
+          rule_id: "SEC-DESER-002"
+          cwe: "CWE-502"
+          fix: "@JsonTypeInfo를 명시적으로 지정하세요"
+
+      - id: "secure-deser-003"
+        name: "XMLDecoder 사용 금지"
+        severity: "critical"
+        category: "deserialization"
+        description: "XMLDecoder는 임의 코드 실행이 가능하여 위험합니다."
+        enabled: true
+        pattern:
+          type: "ast-filtered-regex"
+          regex: "new\\s+XMLDecoder\\s*\\("
+        custom:
+          rule_id: "SEC-DESER-003"
+          cwe: "CWE-502"
+          fix: "JAXB 또는 Jackson XML을 사용하세요"
+
+      - id: "secure-deser-004"
+        name: "SnakeYAML 안전하지 않은 load 사용"
+        severity: "critical"
+        category: "deserialization"
+        description: "SnakeYAML의 yaml.load()는 임의 클래스를 인스턴스화할 수 있습니다."
+        enabled: true
+        pattern:
+          type: "ast-filtered-regex"
+          regex: "yaml\\.load\\s*\\([^)]*\\)"
+        custom:
+          rule_id: "SEC-DESER-004"
+          cwe: "CWE-502"
+          fix: "yaml.loadAs() 또는 SafeConstructor를 사용하세요"
+
+      # ---- 신규 4: 종료되지 않는 반복문/재귀 (CWE-835) ----
+      - id: "secure-loop-001"
+        name: "while(true) 무한 루프"
+        severity: "high"
+        category: "infinite-loop"
+        description: "while(true) 사용 시 반드시 break/return 종료 조건이 필요합니다."
+        enabled: true
+        pattern:
+          type: "method-analysis"
+          conditions:
+            - "while-true-without-break"
+        custom:
+          rule_id: "SEC-LOOP-001"
+          cwe: "CWE-835"
+
+      - id: "secure-loop-002"
+        name: "for(;;) 무한 루프"
+        severity: "high"
+        category: "infinite-loop"
+        description: "for(;;) 사용 시 반드시 break/return 종료 조건이 필요합니다."
+        enabled: true
+        pattern:
+          type: "ast-filtered-regex"
+          regex: "for\\s*\\(\\s*;\\s*;\\s*\\)"
+        custom:
+          rule_id: "SEC-LOOP-002"
+          cwe: "CWE-835"
+
+      - id: "secure-loop-003"
+        name: "종료 조건 없는 재귀 호출"
+        severity: "high"
+        category: "infinite-loop"
+        description: "재귀 호출 시 종료 조건(base case)이 필요합니다."
+        enabled: true
+        pattern:
+          type: "method-analysis"
+          conditions:
+            - "recursive-without-base-case"
+        custom:
+          rule_id: "SEC-LOOP-003"
+          cwe: "CWE-835"
+
+      # ---- 신규 5: 초기화되지 않은 변수 (CWE-457) ----
+      - id: "secure-init-001"
+        name: "지역 변수 조건부 초기화"
+        severity: "medium"
+        category: "uninitialized-variable"
+        description: "지역 변수가 조건부 경로에서만 초기화되면 미초기화 상태로 사용될 수 있습니다."
+        enabled: true
+        pattern:
+          type: "method-analysis"
+          conditions:
+            - "variable-conditional-init"
+        custom:
+          rule_id: "SEC-INIT-001"
+          cwe: "CWE-457"
+
+      # ---- 신규 6: 해제된 자원 사용 (CWE-416) ----
+      - id: "secure-uaf-001"
+        name: "해제된 자원 사용"
+        severity: "critical"
+        category: "use-after-free"
+        description: "close() 호출 후 자원을 재사용하면 예외가 발생합니다."
+        enabled: true
+        pattern:
+          type: "method-analysis"
+          conditions:
+            - "resource-use-after-close"
+        custom:
+          rule_id: "SEC-UAF-001"
+          cwe: "CWE-416"
+
+      # ---- 보강 1: 빈 catch 블록 (CWE-390) ----
+      - id: "secure-err-004"
+        name: "빈 catch 블록 금지"
+        severity: "high"
+        category: "error-handling"
+        description: "catch 블록이 비어있으면 오류 상황에 대응하지 못합니다."
+        enabled: true
+        pattern:
+          type: "ast-try-catch"
+        custom:
+          catch_is_empty: true
+          rule_id: "SEC-ERR-004"
+          cwe: "CWE-390"
+          fix: "예외를 로깅하거나 적절히 처리하세요"
+
+      # ---- 보강 2: 주석 내 시스템 정보 노출 확대 ----
+      - id: "secure-comment-003"
+        name: "주석 내 IP 주소 노출"
+        severity: "high"
+        category: "info-exposure"
+        description: "주석에 내부 IP 주소가 포함되어 있습니다."
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "//[^\\n]*(\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3})"
+        custom:
+          rule_id: "SEC-COMMENT-003"
+          cwe: "CWE-615"
+
+      - id: "secure-comment-004"
+        name: "주석 내 API 키 노출"
+        severity: "critical"
+        category: "info-exposure"
+        description: "주석에 API 키 또는 토큰이 포함되어 있습니다."
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "//[^\\n]*(api[_-]?key|apikey|secret[_-]?key|access[_-]?key|token)\\s*[:=]\\s*[\"']?[A-Za-z0-9+/=_-]{10,}"
+          flags: "i"
+        custom:
+          rule_id: "SEC-COMMENT-004"
+          cwe: "CWE-615"
+
+      - id: "secure-comment-005"
+        name: "주석 내 서버 경로 노출"
+        severity: "medium"
+        category: "info-exposure"
+        description: "주석에 서버 파일 경로가 포함되어 있습니다."
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "//[^\\n]*(/home/[^\\s]+|/usr/[^\\s]+|/var/[^\\s]+|/opt/[^\\s]+|C:\\\\[^\\s]+|/WEB-INF/[^\\s]+)"
+        custom:
+          rule_id: "SEC-COMMENT-005"
+          cwe: "CWE-615"
+
+      # ---- 보강 3: 리플렉션 코드 삽입 ----
+      - id: "secure-code-004"
+        name: "외부입력 Class.forName() 금지"
+        severity: "critical"
+        category: "code-injection"
+        description: "외부 입력값으로 Class.forName()을 호출하면 임의 클래스 로딩이 가능합니다."
+        enabled: true
+        pattern:
+          type: "ast-filtered-regex"
+          regex: "Class\\.forName\\s*\\(\\s*[a-zA-Z_]\\w*\\s*\\)"
+        custom:
+          rule_id: "SEC-CODE-004"
+          cwe: "CWE-470"
+          fix: "화이트리스트로 허용 클래스를 제한하세요"
+
+      - id: "secure-code-005"
+        name: "외부입력 Method.invoke() 금지"
+        severity: "critical"
+        category: "code-injection"
+        description: "외부 입력값으로 Method.invoke()를 호출하면 임의 메서드 실행이 가능합니다."
+        enabled: true
+        pattern:
+          type: "ast-filtered-regex"
+          regex: "getMethod\\s*\\(\\s*[a-zA-Z_]\\w*\\s*\\)"
+        custom:
+          rule_id: "SEC-CODE-005"
+          cwe: "CWE-470"
+          fix: "화이트리스트로 허용 메서드를 제한하세요"
+
+      # ---- 보강 4: JWT 서명 검증 ----
+      - id: "secure-sign-002"
+        name: "JWT 서명 미검증"
+        severity: "critical"
+        category: "signature-verification"
+        description: "JWT 토큰 파싱 시 서명 검증이 필요합니다."
+        enabled: true
+        pattern:
+          type: "ast-filtered-regex"
+          regex: "parseClaimsJwt\\s*\\(|Jwts\\.parser\\(\\)\\s*\\.\\s*parse\\s*\\([^)]*\\)(?![\\s\\S]*setSigningKey)"
+        custom:
+          rule_id: "SEC-SIGN-002"
+          cwe: "CWE-347"
+          fix: "setSigningKey()로 서명 검증을 포함하고 parseClaimsJws()를 사용하세요"
+
+      # ---- 보강 5: 정수 오버플로우 산술연산 ----
+      - id: "secure-int-002"
+        name: "외부입력 산술연산 오버플로우"
+        severity: "high"
+        category: "integer-overflow"
+        description: "외부 입력값의 산술 연산 시 오버플로우 검증이 필요합니다."
+        enabled: true
+        pattern:
+          type: "method-analysis"
+          conditions:
+            - "external-input-arithmetic-overflow"
+        custom:
+          rule_id: "SEC-INT-002"
+          cwe: "CWE-190"
+          fix: "Math.multiplyExact()/addExact() 또는 BigInteger를 사용하세요"
+
+      # ---- 보강 6: Null 검사 범위 확대 ----
+      - id: "secure-npe-002"
+        name: "findById 반환값 Null 검사"
+        severity: "high"
+        category: "null-pointer"
+        description: "Repository.findById() 등의 반환값은 null 검사가 필요합니다."
+        enabled: true
+        pattern:
+          type: "method-analysis"
+          conditions:
+            - "find-method-without-null-check"
+        custom:
+          rule_id: "SEC-NPE-002"
+          cwe: "CWE-476"
+
+      # ---- 보강 7: 시스템 데이터 정보 노출 ----
+      - id: "secure-sysinfo-001"
+        name: "시스템 프로퍼티 응답 노출"
+        severity: "high"
+        category: "system-info-exposure"
+        description: "System.getProperty()를 HTTP 응답에 포함하면 시스템 정보가 노출됩니다."
+        enabled: true
+        pattern:
+          type: "ast-filtered-regex"
+          regex: "(response|out)\\.[^;]*System\\.getProperty\\s*\\("
+        custom:
+          rule_id: "SEC-SYSINFO-001"
+          cwe: "CWE-497"
+          fix: "시스템 정보를 응답에 포함하지 마세요"
+
+      - id: "secure-sysinfo-002"
+        name: "환경변수 응답 노출"
+        severity: "critical"
+        category: "system-info-exposure"
+        description: "System.getenv()를 HTTP 응답에 포함하면 환경변수가 노출됩니다."
+        enabled: true
+        pattern:
+          type: "ast-filtered-regex"
+          regex: "(response|out)\\.[^;]*System\\.getenv\\s*\\("
+        custom:
+          rule_id: "SEC-SYSINFO-002"
+          cwe: "CWE-497"
+          fix: "환경변수를 응답에 포함하지 마세요"
+
+      # ---- spo 분석 보강: 문자열 연결 SQL Injection ----
+      - id: "secure-sqli-concat-001"
+        name: "문자열 연결을 통한 SQL 생성"
+        severity: "critical"
+        category: "sql-injection"
+        description: "SQL 절에 문자열 연결(+)으로 변수를 삽입하면 SQL Injection 위험이 있습니다."
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "(WHERE|AND|OR)\\s*[^\"]*\"\\s*\\+\\s*\\w+"
+        custom:
+          rule_id: "SEC-SQLI-CONCAT-001"
+          cwe: "CWE-89"
+          fix: "PreparedStatement 또는 MyBatis #{} 바인드 변수를 사용하세요"
+
+      # ---- spo 분석 보강: hex 인코딩 하드코딩 키/토큰 ----
+      - id: "secure-hard-hex-001"
+        name: "하드코딩된 hex 인코딩 키/토큰"
+        severity: "high"
+        category: "hardcoded-credential"
+        description: "32자 이상의 hex 인코딩 문자열이 변수에 할당되어 있습니다. 하드코딩된 키/토큰일 수 있습니다."
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "(key|token|secret|siteKey|apiKey|authKey|encKey|password|passwd|credential)\\s*=\\s*\"[0-9a-fA-F]{32,}\""
+        custom:
+          rule_id: "SEC-HARD-HEX-001"
+          cwe: "CWE-798"
+          fix: "외부 설정 파일이나 환경 변수를 사용하세요"
+
+      # ---- spo 분석 보강: 주석 처리된 보안 코드 ----
+      - id: "secure-commented-auth-001"
+        name: "주석 처리된 인증/인가 코드"
+        severity: "high"
+        category: "authentication"
+        description: "인증/인가 관련 코드가 주석 처리되어 있습니다. 보안 검증이 우회될 수 있습니다."
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "//\\s*(if\\s*\\(\\s*(loginVO|session|userInfo|loginInfo|authInfo)\\s*(==|!=)\\s*null)"
+        custom:
+          rule_id: "SEC-COMMENT-AUTH-001"
+          cwe: "CWE-287"
+          fix: "주석 처리된 인증/인가 코드를 확인하고, 필요하면 복원하세요"
+
+      # ---- spo 분석 보강: 인증 없는 API 엔드포인트 ----
+      - id: "secure-api-noauth-001"
+        name: "인증 없는 API 엔드포인트"
+        severity: "medium"
+        category: "authentication"
+        description: "@ResponseBody API 엔드포인트에 인증/세션 검증이 없습니다. (프론트 분리 환경에서 중요)"
+        enabled: true
+        pattern:
+          type: "method-analysis"
+          conditions:
+            - "api-endpoint-without-auth"
+        custom:
+          rule_id: "SEC-API-NOAUTH-001"
+          cwe: "CWE-306"
+          fix: "API 엔드포인트에 인증/인가 검증을 추가하세요"
+
+      # ==================== 8. CWE Top 25 갭 보완 ====================
+
+      # 8.1 잘못된 권한 검증 - IDOR (CWE-863, CWE-639)
+      - id: "secure-idor-001"
+        name: "PathVariable ID 직접 DB 조회"
+        severity: "medium"
+        category: "authorization"
+        description: "@PathVariable로 받은 ID를 findById/selectById로 직접 조회하면 타 사용자 리소스에 접근할 수 있습니다. 세션 사용자와 리소스 소유자 일치 여부를 검증하세요."
+        enabled: true
+        tags:
+          - "CWE-639"
+          - "idor"
+        pattern:
+          type: "regex-multiline"
+          regex: "@PathVariable[^)]*\\)\\s+\\w+\\s+(\\w+)[\\s\\S]{0,500}(findById|selectById|getById)\\s*\\(\\s*\\1\\s*\\)"
+        custom:
+          rule_id: "SEC-IDOR-001"
+          cwe: "CWE-639"
+          fix: "리소스 조회 후 세션 사용자와 소유자 일치 여부를 반드시 검증하세요"
+
+      # 8.2 민감정보 노출 (CWE-200)
+      - id: "secure-info-001"
+        name: "예외 응답에 내부 정보 노출"
+        severity: "medium"
+        category: "information-exposure"
+        description: "@ExceptionHandler에서 예외 메시지(e.getMessage(), e.toString())를 클라이언트 응답에 직접 포함하면 내부 구조가 노출됩니다."
+        enabled: true
+        tags:
+          - "CWE-200"
+          - "information-exposure"
+        pattern:
+          type: "regex-multiline"
+          regex: "@ExceptionHandler[\\s\\S]{0,500}(e\\.getMessage\\(\\)|e\\.toString\\(\\)|exception\\.getMessage\\(\\)|ex\\.getMessage\\(\\))"
+        custom:
+          rule_id: "SEC-INFO-001"
+          cwe: "CWE-200"
+          fix: "클라이언트에는 일반적인 에러 메시지만 반환하고, 상세 예외는 서버 로그에만 기록하세요"
+
+      - id: "secure-info-002"
+        name: "Spring Boot 에러 상세 노출 설정"
+        severity: "medium"
+        category: "information-exposure"
+        description: "server.error.include-stacktrace=always 또는 include-message=always 설정은 에러 응답에 스택트레이스/메시지를 포함시켜 내부 정보가 노출됩니다."
+        enabled: true
+        tags:
+          - "CWE-200"
+          - "information-exposure"
+        pattern:
+          type: "regex"
+          regex: "server\\.error\\.include-(stacktrace|message|binding-errors)\\s*=\\s*always"
+        custom:
+          rule_id: "SEC-INFO-002"
+          cwe: "CWE-200"
+          fix: "운영 환경에서는 server.error.include-stacktrace=never로 설정하세요"
+
+      # 8.3 리소스 제한 없음 (CWE-770)
+      - id: "secure-dos-001"
+        name: "파일 업로드 크기 검증 필요"
+        severity: "low"
+        category: "resource-exhaustion"
+        description: "MultipartFile을 파라미터로 받는 경우 파일 크기 검증이 필요합니다. getSize()로 크기를 확인하거나 spring.servlet.multipart.max-file-size를 설정하세요."
+        enabled: true
+        tags:
+          - "CWE-770"
+          - "dos"
+        pattern:
+          type: "ast-filtered-regex"
+          regex: "MultipartFile\\b"
+        exclude:
+          - "^\\s*import\\s"
+          - "\\bget[A-Z]\\w*\\s*\\("
+          - "\\bset[A-Z]\\w*\\s*\\("
+        custom:
+          rule_id: "SEC-DOS-001"
+          cwe: "CWE-770"
+          fix: "file.getSize()로 크기를 검증하거나 spring.servlet.multipart.max-file-size를 설정하세요"
+
+  - language: javascript
+    rules:
+      # jQuery DOM 조작 XSS
+      - id: "secure-xss-jquery-001"
+        name: "jQuery DOM 조작 XSS 위험"
+        severity: "high"
+        category: "xss"
+        description: ".html(), .append() 등 jQuery DOM 조작에 사용자 입력값을 삽입하면 XSS에 취약합니다."
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "\\.(html|append|prepend|after|before|replaceWith)\\s*\\([^)]*[+]"
+        custom:
+          rule_id: "SEC-XSS-JQUERY-001"
+          fix: ".text()를 사용하거나, 입력값을 이스케이핑 후 삽입하세요"
+
+      - id: "secure-xss-jquery-002"
+        name: "jQuery .html() 직접 변수 삽입"
+        severity: "high"
+        category: "xss"
+        description: ".html()에 변수를 직접 삽입하면 XSS에 취약합니다."
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "\\$\\s*\\([^)]+\\)\\s*\\.\\s*html\\s*\\(\\s*[a-zA-Z_$]"
+        custom:
+          rule_id: "SEC-XSS-JQUERY-002"
+          fix: ".text()를 사용하거나, DOMPurify 등으로 sanitize하세요"
+
+  - language: html
+    rules:
+      # 인라인 이벤트 핸들러 (onclick 등)
+      - id: "secure-xss-inline-001"
+        name: "인라인 이벤트 핸들러 사용"
+        severity: "medium"
+        category: "xss"
+        description: "onclick 등 인라인 이벤트 핸들러는 CSP 위반이며 XSS 위험이 있습니다."
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "\\s+on(click|change|submit|load|error|mouseover|keyup|keydown|focus|blur)\\s*="
+        custom:
+          rule_id: "SEC-XSS-INLINE-001"
+          fix: "addEventListener()를 사용하세요"
+
+  - language: properties
+    rules:
+      # Spring Boot 에러 상세 노출 설정 (CWE-200)
+      - id: "secure-info-props-001"
+        name: "에러 상세 노출 설정"
+        severity: "medium"
+        category: "information-exposure"
+        description: "server.error.include-stacktrace=always 설정은 운영 환경에서 내부 정보를 노출합니다."
+        enabled: true
+        tags:
+          - "CWE-200"
+        pattern:
+          type: "regex"
+          regex: "server\\.error\\.include-(stacktrace|message|binding-errors)\\s*=\\s*always"
+        custom:
+          rule_id: "SEC-INFO-PROPS-001"
+          cwe: "CWE-200"
+          fix: "운영 환경에서는 never로 설정하세요"

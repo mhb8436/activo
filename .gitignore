@@ -35,3 +35,5 @@ coverage/
 *.md
 !README.md
 !docs/*.md
+NSNR*.md
+*.pdf

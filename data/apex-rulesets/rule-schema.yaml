@@ -1,0 +1,587 @@
+# APEX YAML Rule Schema — LLM Rule Generation Reference
+# Version: 1.0
+# Purpose: LLM이 이 스키마를 읽고 유효한 커스텀 규칙 YAML을 생성할 수 있도록 하는 참조 문서
+#
+# Usage:
+#   1. activo의 generate_apex_rules 도구가 이 파일을 읽음
+#   2. 개발표준 항목 + 이 스키마 → LLM에게 규칙 생성 요청
+#   3. 생성된 규칙은 configs/rulesets/ 에 배치하여 apex가 실행
+
+version: "1.0"
+description: "APEX YAML 규칙 스키마 — LLM 규칙 생성용"
+
+# ─────────────────────────────────────────────
+# 규칙 기본 형식
+# ─────────────────────────────────────────────
+rule_format:
+  required_fields:
+    - id          # string: 규칙 고유 ID
+    - name        # string: 규칙 이름 (한글 가능)
+    - severity    # enum: low | medium | high | critical
+    - category    # string: 분류 (naming, security, exception, performance, design 등)
+    - description # string: 위반 시 설명
+    - enabled     # boolean: 활성화 여부
+    - pattern     # object: 패턴 정의 (아래 pattern_types 참조)
+
+  optional_fields:
+    - exclude         # string[]: 제외할 파일 패턴 (glob)
+    - file_extensions # string[]: 대상 파일 확장자 (기본: 언어에 따라 자동)
+    - custom          # map: 추가 메타데이터 (rule_id, fix, cwe, example 등)
+
+  severity_values: ["low", "medium", "high", "critical"]
+
+  id_convention: "custom-{category}-{number}"
+  # 예: custom-naming-001, custom-security-001, custom-perf-001
+
+  ruleset_format: |
+    # 규칙셋 파일 형식 (configs/rulesets/*.yaml)
+    version: "1.0"
+    profile: "custom"
+    languages:
+      - language: java
+        rules:
+          - id: "custom-xxx-001"
+            ...
+      - language: sql
+        rules:
+          - id: "custom-sql-001"
+            ...
+
+# ─────────────────────────────────────────────
+# 패턴 타입 정의 (20개)
+# ─────────────────────────────────────────────
+pattern_types:
+
+  # ========== 1. regex ==========
+  - type: "regex"
+    description: "소스 라인별 정규식 매칭. 주석/문자열 내부도 매칭됨."
+    languages: [java, javascript, html, css, sql, xml, python]
+    params:
+      required: [regex]
+      optional: [flags]
+    notes: |
+      - flags: "i" (대소문자 무시)
+      - 주석 내부도 매칭되므로, 주석 제외가 필요하면 ast-filtered-regex 사용
+    example:
+      - id: "custom-logging-001"
+        name: "System.out 사용 금지"
+        severity: "medium"
+        category: "logging"
+        description: "운영 코드에서 System.out 사용 금지. Logger를 사용하세요."
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "System\\.(out|err)\\.(print|println)"
+
+  # ========== 2. regex-multiline ==========
+  - type: "regex-multiline"
+    description: "여러 줄에 걸친 정규식 매칭. [\\s\\S]로 줄바꿈 포함 매칭 가능."
+    languages: [java, javascript, html, css, sql, xml, python]
+    params:
+      required: [regex]
+      optional: [flags]
+    notes: |
+      - 파일 전체 텍스트에서 매칭 (줄 단위가 아님)
+      - flags: "i" (대소문자 무시)
+      - SQL 패턴이나 어노테이션+메서드 조합 검출에 유용
+    example:
+      - id: "custom-sql-smell-001"
+        name: "SELECT DISTINCT + GROUP BY 동시 사용"
+        severity: "high"
+        category: "performance"
+        description: "SELECT DISTINCT와 GROUP BY를 동시에 사용하면 불필요한 중복 정렬이 발생합니다."
+        enabled: true
+        pattern:
+          type: "regex-multiline"
+          regex: "\\bSELECT\\s+DISTINCT\\b[\\s\\S]*?\\bGROUP\\s+BY\\b"
+          flags: "i"
+
+  # ========== 3. ast-filtered-regex ==========
+  - type: "ast-filtered-regex"
+    description: "Java AST 분석으로 주석/문자열 내부를 제외한 후 정규식 매칭."
+    languages: [java]
+    params:
+      required: [regex]
+      optional: [flags]
+    notes: |
+      - regex와 동일하지만, 주석(// /* */)과 문자열 리터럴 내부를 제외
+      - SQL 문자열 연결 등 정확한 코드 영역만 검출할 때 사용
+    example:
+      - id: "custom-security-001"
+        name: "문자열 연결 쿼리 금지"
+        severity: "critical"
+        category: "sql-injection"
+        description: "SQL 문자열 연결은 SQL Injection에 취약합니다."
+        enabled: true
+        pattern:
+          type: "ast-filtered-regex"
+          regex: "\"SELECT[^\"]*\"\\s*\\+|\"INSERT[^\"]*\"\\s*\\+|\"UPDATE[^\"]*\"\\s*\\+|\"DELETE[^\"]*\"\\s*\\+"
+
+  # ========== 4. annotation-missing-attr ==========
+  - type: "annotation-missing-attr"
+    description: "Java 어노테이션에서 필수 속성이 누락된 경우 검출."
+    languages: [java]
+    params:
+      required: [annotation, required_attr]
+      optional: []
+    notes: |
+      - annotation: 어노테이션 이름 (@ 제외)
+      - required_attr: 반드시 있어야 하는 속성명
+    example:
+      - id: "custom-api-001"
+        name: "@DzParam key 속성 누락"
+        severity: "high"
+        category: "api"
+        description: "@DzParam 어노테이션에 key 속성이 필요합니다."
+        enabled: true
+        pattern:
+          type: "annotation-missing-attr"
+          annotation: "DzParam"
+          required_attr: "key"
+
+  # ========== 5. line-length ==========
+  - type: "line-length"
+    description: "라인 길이가 max_length를 초과하는 경우 검출."
+    languages: [java, sql, javascript, python]
+    params:
+      required: [max_length]
+      optional: [line_pattern]
+    notes: |
+      - max_length: 최대 허용 문자 수
+      - line_pattern: 특정 패턴의 라인만 검사 (정규식, 선택사항)
+    example:
+      - id: "custom-format-001"
+        name: "SQL 라인 80자 초과"
+        severity: "low"
+        category: "format"
+        description: "한 라인 80자 초과는 가독성을 저해합니다."
+        enabled: true
+        pattern:
+          type: "line-length"
+          max_length: 80
+
+  # ========== 6. ast-method-call ==========
+  - type: "ast-method-call"
+    description: "Java 메서드 호출 탐지. 메서드명, 호출 객체, 컨텍스트 조건 지정 가능."
+    languages: [java]
+    params:
+      required: []
+      optional: [method, qualifier, context]
+    notes: |
+      - method: 메서드명 정규식 (예: "^executeQuery$")
+      - qualifier: 호출 객체 정규식 (예: "(?i)engine")
+      - context: 호출 위치 조건
+        - "inside-loop": 루프 내부
+        - "inside-catch": catch 블록 내부
+        - "not-inside-catch": catch 블록 외부
+        - "method-name:<regex>": 특정 메서드 내
+        - "has-method-annotation:<regex>": 메서드에 특정 어노테이션이 있을 때
+    custom_fields: [args_min, args_max, fix]
+    example:
+      - id: "custom-perf-001"
+        name: "루프 내 DB 호출"
+        severity: "high"
+        category: "performance"
+        description: "루프 내에서 DB 쿼리를 호출하면 N+1 문제가 발생합니다."
+        enabled: true
+        pattern:
+          type: "ast-method-call"
+          method: "^(executeQuery|executeUpdate)$"
+          context: "inside-loop"
+
+  # ========== 7. ast-annotation ==========
+  - type: "ast-annotation"
+    description: "Java 어노테이션 존재/속성 검사."
+    languages: [java]
+    params:
+      required: [annotation]
+      optional: [missing_attr_name, attr_value, context]
+    notes: |
+      - annotation: 어노테이션명 정규식 (@ 제외, 예: "^Autowired$")
+      - missing_attr_name: 이 속성이 없으면 위반 (예: "method")
+      - attr_value: 속성값 정규식
+      - context: "method-name:<regex>" 등
+    example:
+      - id: "custom-design-001"
+        name: "@RequestMapping method 속성 누락"
+        severity: "medium"
+        category: "design"
+        description: "@RequestMapping에 method 속성이 없으면 모든 HTTP 메서드를 허용합니다."
+        enabled: true
+        pattern:
+          type: "ast-annotation"
+          annotation: "^RequestMapping$"
+          missing_attr_name: "method"
+          context: "method-name:.*"
+
+  # ========== 8. ast-import ==========
+  - type: "ast-import"
+    description: "Java import 문 검사. deprecated/금지 패키지 검출."
+    languages: [java]
+    params:
+      required: [import]
+      optional: [class_annotation]
+    notes: |
+      - import: import 경로 정규식 (예: "^java\\.util\\.Date$")
+      - class_annotation: 클래스에 특정 어노테이션이 있을 때만 검사
+    example:
+      - id: "custom-deprecated-001"
+        name: "java.util.Date import 금지"
+        severity: "medium"
+        category: "deprecated"
+        description: "java.util.Date는 thread-unsafe합니다. java.time API를 사용하세요."
+        enabled: true
+        pattern:
+          type: "ast-import"
+          import: "^java\\.util\\.Date$"
+
+  # ========== 9. ast-variable ==========
+  - type: "ast-variable"
+    description: "Java 변수 선언 검사. 타입, 이름 패턴으로 네이밍 규칙 위반 검출."
+    languages: [java]
+    params:
+      required: []
+      optional: [name_pattern, type_pattern]
+    notes: |
+      - name_pattern: 변수명 정규식 (위반 시 매칭)
+      - type_pattern: 변수 타입 정규식
+      - 둘 다 지정 시 AND 조건
+    example:
+      - id: "custom-naming-001"
+        name: "String 변수 헝가리안 표기법 금지"
+        severity: "low"
+        category: "naming"
+        description: "strXxx 형태의 헝가리안 표기법은 사용하지 마세요."
+        enabled: true
+        pattern:
+          type: "ast-variable"
+          type_pattern: "String"
+          name_pattern: "^str[A-Z]"
+
+  # ========== 10. ast-try-catch ==========
+  - type: "ast-try-catch"
+    description: "Java 예외 처리 패턴 검사. 빈 catch, 특정 예외 타입 처리 등."
+    languages: [java]
+    params:
+      required: []
+      optional: [exception_type]
+    notes: |
+      - exception_type: catch하는 예외 타입 정규식 (예: "IOException|SQLException")
+      - custom.catch_is_empty: true → 빈 catch 블록 검출
+      - custom.has_resources: false → try-with-resources 미사용
+      - custom.has_finally: false → finally 블록 없음
+    example:
+      - id: "custom-exception-001"
+        name: "빈 catch 블록"
+        severity: "critical"
+        category: "exception"
+        description: "catch 블록이 비어있으면 예외가 무시됩니다."
+        enabled: true
+        pattern:
+          type: "ast-try-catch"
+        custom:
+          catch_is_empty: true
+          fix: "catch 블록에 logger.error(\"message\", e)를 추가하세요"
+
+  # ========== 11. ast-class ==========
+  - type: "ast-class"
+    description: "Java 클래스 레벨 검사. 클래스명, 메서드 수, 필수 어노테이션 등."
+    languages: [java]
+    params:
+      required: []
+      optional: [name_pattern, has_annotation, missing_annotation]
+    notes: |
+      - name_pattern: 클래스명 정규식 (예: ".*ServiceImpl$")
+      - has_annotation: 클래스에 이 어노테이션이 있을 때 검사
+      - missing_annotation: 클래스에 이 어노테이션이 없으면 위반
+      - custom.max_methods: 메서드 수 초과 시 위반
+    example:
+      - id: "custom-design-002"
+        name: "ServiceImpl 과대 클래스"
+        severity: "medium"
+        category: "design"
+        description: "ServiceImpl 클래스의 메서드가 너무 많습니다. 책임을 분리하세요."
+        enabled: true
+        pattern:
+          type: "ast-class"
+          name_pattern: ".*ServiceImpl$"
+        custom:
+          max_methods: 20
+          fix: "도메인별로 Service 클래스를 분리하세요"
+
+  # ========== 12. ast-method ==========
+  - type: "ast-method"
+    description: "Java 메서드 선언 검사. 메서드명, 파라미터 수, 라인 수 등."
+    languages: [java]
+    params:
+      required: []
+      optional: [name_pattern, context]
+    notes: |
+      - name_pattern: 메서드명 정규식
+      - context: "has-method-annotation:<regex>" 등
+      - custom.max_lines: 메서드 라인 수 초과 시 위반
+      - custom.max_params: 파라미터 수 초과 시 위반
+    example:
+      - id: "custom-design-003"
+        name: "메서드 라인 수 초과"
+        severity: "medium"
+        category: "design"
+        description: "메서드가 너무 깁니다. 50줄 이내로 분리하세요."
+        enabled: true
+        pattern:
+          type: "ast-method"
+        custom:
+          max_lines: 50
+          fix: "메서드를 더 작은 단위로 분리하세요"
+
+  # ========== 13. ast-multi-cud ==========
+  - type: "ast-multi-cud"
+    description: "Java 메서드 내 복수 CUD(Create/Update/Delete) 호출 검사. @Transactional 누락 검출."
+    languages: [java]
+    params:
+      required: []
+      optional: [method, qualifier]
+    notes: |
+      - method: CUD 메서드명 정규식 (예: "insert|update|delete|save|remove")
+      - qualifier: 호출 대상 객체 정규식 (예: ".*Dao|.*Repository|.*Mapper")
+      - custom.min_cud_calls: N개 이상 CUD 호출 시 위반 (기본: 2)
+    example:
+      - id: "custom-tx-001"
+        name: "복수 CUD 작업에 @Transactional 누락"
+        severity: "high"
+        category: "transaction"
+        description: "2개 이상의 CUD 작업 호출 시 @Transactional이 필요합니다."
+        enabled: true
+        pattern:
+          type: "ast-multi-cud"
+          method: "insert|update|delete|save|remove|create|modify"
+          qualifier: ".*Dao|.*Repository|.*Mapper|.*Service"
+        custom:
+          min_cud_calls: 2
+          fix: "@Transactional을 추가하세요"
+
+  # ========== 14. ast-dead-code ==========
+  - type: "ast-dead-code"
+    description: "Java 미사용 코드 검출. private 메서드/필드 중 호출되지 않는 것 검출."
+    languages: [java]
+    params:
+      required: []
+      optional: []
+    notes: |
+      - 파일 내에서 선언되었으나 사용되지 않는 private 메서드/필드 검출
+      - 리플렉션이나 외부 참조는 탐지 불가 (오탐 가능)
+    example:
+      - id: "custom-clean-001"
+        name: "미사용 private 메서드"
+        severity: "low"
+        category: "dead-code"
+        description: "사용되지 않는 private 메서드는 제거하세요."
+        enabled: true
+        pattern:
+          type: "ast-dead-code"
+
+  # ========== 15. ast-sql-table ==========
+  - type: "ast-sql-table"
+    description: "SQL AST 분석 — 테이블 참조 검사. 과다 테이블 조인 등."
+    languages: [sql]
+    params:
+      required: [conditions]
+      optional: []
+    notes: |
+      conditions 값:
+        - "table-count-excessive": JOIN 테이블 수 초과 (custom.max_tables로 임계값)
+        - "missing-alias": 테이블 별칭 누락
+    example:
+      - id: "custom-sql-table-001"
+        name: "JOIN 테이블 7개 초과"
+        severity: "high"
+        category: "maintainability"
+        description: "JOIN 테이블이 7개를 초과합니다. 쿼리를 분리하세요."
+        enabled: true
+        pattern:
+          type: "ast-sql-table"
+          conditions:
+            - "table-count-excessive"
+        custom:
+          max_tables: 7
+
+  # ========== 16. ast-sql-join ==========
+  - type: "ast-sql-join"
+    description: "SQL AST 분석 — JOIN 패턴 검사."
+    languages: [sql]
+    params:
+      required: [conditions]
+      optional: []
+    notes: |
+      conditions 값:
+        - "left-join-excessive": LEFT JOIN 과다 (custom.max_left_joins)
+        - "cartesian-product": 카르테시안 곱 (FROM a, b without JOIN condition)
+        - "left-join-where-filter": LEFT JOIN 후 WHERE에서 필터 (실질 INNER JOIN)
+        - "inner-after-left": LEFT JOIN 체인에서 INNER JOIN 사용
+    example:
+      - id: "custom-sql-join-001"
+        name: "LEFT JOIN 과다"
+        severity: "high"
+        category: "maintainability"
+        description: "LEFT JOIN이 5개를 초과합니다."
+        enabled: true
+        pattern:
+          type: "ast-sql-join"
+          conditions:
+            - "left-join-excessive"
+        custom:
+          max_left_joins: 5
+
+  # ========== 17. ast-sql-select ==========
+  - type: "ast-sql-select"
+    description: "SQL AST 분석 — SELECT 절 검사."
+    languages: [sql]
+    params:
+      required: [conditions]
+      optional: []
+    notes: |
+      conditions 값:
+        - "select-star": SELECT * 사용
+        - "column-count-excessive": 컬럼 수 초과 (custom.max_columns)
+    example:
+      - id: "custom-sql-select-001"
+        name: "SELECT * 사용 금지"
+        severity: "medium"
+        category: "performance"
+        description: "SELECT *는 불필요한 컬럼까지 조회합니다."
+        enabled: true
+        pattern:
+          type: "ast-sql-select"
+          conditions:
+            - "select-star"
+
+  # ========== 18. ast-sql-where ==========
+  - type: "ast-sql-where"
+    description: "SQL AST 분석 — WHERE 절 검사."
+    languages: [sql]
+    params:
+      required: [conditions]
+      optional: []
+    notes: |
+      conditions 값:
+        - "function-on-column": 컬럼에 함수 적용 (인덱스 무효화)
+        - "implicit-type-cast": 암시적 타입 변환
+        - "having-non-aggregate": HAVING절에 비집계 조건
+    example:
+      - id: "custom-sql-where-001"
+        name: "WHERE 절 컬럼 함수 적용"
+        severity: "high"
+        category: "performance"
+        description: "WHERE절에서 컬럼에 함수를 적용하면 인덱스를 사용할 수 없습니다."
+        enabled: true
+        pattern:
+          type: "ast-sql-where"
+          conditions:
+            - "function-on-column"
+
+  # ========== 19. ast-sql-subquery ==========
+  - type: "ast-sql-subquery"
+    description: "SQL AST 분석 — 서브쿼리 검사."
+    languages: [sql]
+    params:
+      required: [conditions]
+      optional: []
+    notes: |
+      conditions 값:
+        - "scalar-subquery-excessive": SELECT절 스칼라 서브쿼리 과다 (custom.max_scalar_subqueries)
+        - "correlated-in-where": WHERE절 상관 서브쿼리
+        - "nested-depth-excessive": 서브쿼리 중첩 깊이 과다
+    example:
+      - id: "custom-sql-subquery-001"
+        name: "스칼라 서브쿼리 과다"
+        severity: "high"
+        category: "performance"
+        description: "SELECT 절에 스칼라 서브쿼리가 2개를 초과합니다."
+        enabled: true
+        pattern:
+          type: "ast-sql-subquery"
+          conditions:
+            - "scalar-subquery-excessive"
+        custom:
+          max_scalar_subqueries: 2
+
+  # ========== 20. ast-sql-hint ==========
+  - type: "ast-sql-hint"
+    description: "SQL AST 분석 — Oracle 힌트 검사."
+    languages: [sql]
+    params:
+      required: [conditions]
+      optional: []
+    notes: |
+      conditions 값:
+        - "hint-exists": 힌트 사용 감지
+        - "non-leading-hint": LEADING 외 힌트 사용
+    example:
+      - id: "custom-sql-hint-001"
+        name: "힌트 사용 감지"
+        severity: "high"
+        category: "hint"
+        description: "힌트 사용은 DBA 협의가 필요합니다."
+        enabled: true
+        pattern:
+          type: "ast-sql-hint"
+          conditions:
+            - "hint-exists"
+
+# ─────────────────────────────────────────────
+# 추가 SQL AST 타입 (참고)
+# ─────────────────────────────────────────────
+additional_sql_types:
+  - type: "ast-sql-setop"
+    description: "UNION/EXCEPT/INTERSECT 연산 검사"
+    conditions: ["union-without-all", "setop-column-mismatch"]
+
+  - type: "ast-sql-orderby"
+    description: "ORDER BY 절 검사"
+    conditions: ["orderby-number", "orderby-with-union"]
+
+# ─────────────────────────────────────────────
+# YAML로 생성 불가능한 타입 (Go 코드 수정 필요)
+# ─────────────────────────────────────────────
+code_only_types:
+  - type: "method-analysis"
+    description: "Go로 구현된 커스텀 분석 로직. MyBatis XML 내 SQL 추출, 복합 분석 등."
+    note: "YAML로 생성 불가. Go 소스 수정 필요."
+    existing_rules:
+      - "sql-fmt-*"    # SQL 포맷 규칙 (method-analysis 기반)
+      - "sql-mybatis-*" # MyBatis SQL 추출 기반 규칙
+
+  - type: "cross-file"
+    description: "여러 파일에 걸친 분석. 인터페이스-구현체 불일치 등."
+    note: "YAML로 생성 불가. Go 소스 수정 필요."
+
+  - type: "private-field"
+    description: "private 필드 접근 패턴 분석."
+    note: "Go 엔진 내장 규칙."
+
+  - type: "private-method"
+    description: "private 메서드 호출 패턴 분석."
+    note: "Go 엔진 내장 규칙."
+
+# ─────────────────────────────────────────────
+# 유효한 카테고리 예시
+# ─────────────────────────────────────────────
+category_examples:
+  - naming        # 명명규칙
+  - security      # 보안
+  - sql-injection # SQL 인젝션
+  - exception     # 예외 처리
+  - performance   # 성능
+  - design        # 설계
+  - transaction   # 트랜잭션
+  - logging       # 로깅
+  - deprecated    # 비추천 API
+  - format        # 포맷/스타일
+  - documentation # 문서화
+  - dead-code     # 미사용 코드
+  - maintainability # 유지보수성
+  - correctness   # 정확성
+  - architecture  # 아키텍처
+  - resource      # 리소스 관리
+  - api           # API 규약
+  - hint          # SQL 힌트

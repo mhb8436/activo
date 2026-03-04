@@ -1,0 +1,469 @@
+# eGovernment Framework Standards Ruleset
+# 전자정부 표준프레임워크 개발 표준 규칙
+# - 계층 구조 및 명명 규칙
+# - Service / Mapper / DAO 표준
+# - 공통 컴포넌트 활용
+# - 메서드 명명 표준 (CRUD 접두사)
+# - 아키텍처 위반 검출
+version: "1.0"
+profile: "egov"
+
+languages:
+  - language: java
+    rules:
+      # ==================== 1. 계층 명명규칙 ====================
+
+      - id: "egov-naming-001"
+        name: "Controller 클래스 접미사 누락"
+        severity: "high"
+        category: "naming"
+        description: "Controller 역할 클래스는 *Controller 접미사를 사용해야 합니다."
+        enabled: true
+        pattern:
+          type: "regex-multiline"
+          regex: "@Controller[\\s\\S]*?class\\s+(?!\\w*Controller\\b)\\w+"
+        custom:
+          rule_id: "EGOV-NAME-001"
+          fix: "클래스명에 Controller 접미사를 추가하세요 (예: UserMngController)"
+
+      - id: "egov-naming-002"
+        name: "Service 인터페이스 접미사 누락"
+        severity: "high"
+        category: "naming"
+        description: "Service 역할 인터페이스는 *Service 접미사를 사용해야 합니다."
+        enabled: true
+        pattern:
+          type: "regex-multiline"
+          regex: "interface\\s+(?![A-Z]\\w*Service\\b)\\w+\\s*\\{[\\s\\S]*?(select|insert|update|delete)\\w+\\s*\\("
+        custom:
+          rule_id: "EGOV-NAME-002"
+          fix: "인터페이스명에 Service 접미사를 추가하세요 (예: UserMngService)"
+
+      - id: "egov-naming-003"
+        name: "ServiceImpl 클래스 접미사 누락"
+        severity: "high"
+        category: "naming"
+        description: "Service 구현 클래스는 *ServiceImpl 접미사를 사용해야 합니다."
+        enabled: true
+        pattern:
+          type: "regex-multiline"
+          regex: "class\\s+(?!\\w*ServiceImpl\\b)\\w+[^{]*implements\\s+\\w+Service\\b"
+        custom:
+          rule_id: "EGOV-NAME-003"
+          fix: "클래스명에 ServiceImpl 접미사를 추가하세요 (예: UserMngServiceImpl)"
+
+      - id: "egov-naming-004"
+        name: "Mapper/DAO 인터페이스 접미사 위반"
+        severity: "medium"
+        category: "naming"
+        description: "데이터 접근 인터페이스는 *Mapper 또는 *DAO 접미사를 사용해야 합니다."
+        enabled: true
+        pattern:
+          type: "regex-multiline"
+          regex: "@Mapper[\\s\\S]*?interface\\s+(?!\\w*(Mapper|DAO)\\b)\\w+"
+        custom:
+          rule_id: "EGOV-NAME-004"
+          fix: "인터페이스명에 Mapper 접미사를 추가하세요 (예: UserMngMapper)"
+
+      - id: "egov-naming-005"
+        name: "VO/DTO 클래스 접미사 위반"
+        severity: "low"
+        category: "naming"
+        description: "데이터 전달 객체는 *Vo, *VO, *Dto, *DTO 접미사를 사용해야 합니다."
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "class\\s+(?!\\w*(Vo|VO|Dto|DTO|Entity|Model)\\b)\\w+\\s+implements\\s+Serializable"
+        custom:
+          rule_id: "EGOV-NAME-005"
+          fix: "클래스명에 Vo 또는 Dto 접미사를 추가하세요 (예: UserMngVo)"
+
+      - id: "egov-naming-006"
+        name: "패키지 구조 표준 위반"
+        severity: "medium"
+        category: "naming"
+        description: "전자정부프레임워크 표준 패키지 구조(web/service/service.impl/dao)를 따르지 않습니다."
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "^package\\s+(?!.*(web|controller|service|dao|mapper|repository|vo|dto|model|util|common|config))[^;]+;"
+        custom:
+          rule_id: "EGOV-NAME-006"
+          fix: "표준 패키지 구조를 따르세요: web, service, service.impl, dao(mapper), vo(dto)"
+          example: "gov.nges.benefit.usm.web / gov.nges.benefit.usm.service.impl"
+
+      # ==================== 2. Service 표준 ====================
+
+      - id: "egov-svc-001"
+        name: "ServiceImpl이 EgovAbstractServiceImpl 미상속"
+        severity: "medium"
+        category: "egov-standard"
+        description: "ServiceImpl 클래스는 EgovAbstractServiceImpl을 상속하여 프레임워크 표준 기능(로깅, 예외처리)을 활용해야 합니다."
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "class\\s+\\w+ServiceImpl\\s+(?!.*extends.*Egov)(?=.*implements)"
+        custom:
+          rule_id: "EGOV-SVC-001"
+          fix: "EgovAbstractServiceImpl을 상속하세요"
+          example: "public class UserMngServiceImpl extends EgovAbstractServiceImpl implements UserMngService"
+
+      - id: "egov-svc-002"
+        name: "Service에서 다른 Service 직접 생성"
+        severity: "high"
+        category: "egov-standard"
+        description: "Service에서 new로 다른 Service 인스턴스를 직접 생성하면 의존성 주입이 작동하지 않습니다."
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "new\\s+\\w+ServiceImpl\\s*\\("
+        custom:
+          rule_id: "EGOV-SVC-002"
+          fix: "Spring DI(@Autowired 또는 생성자 주입)를 사용하세요"
+
+      - id: "egov-svc-003"
+        name: "Service에서 HttpServletRequest/Response 사용"
+        severity: "high"
+        category: "egov-standard"
+        description: "Service 계층에서 Servlet API를 사용하면 웹 계층에 종속됩니다."
+        enabled: true
+        pattern:
+          type: "regex-multiline"
+          regex: "@Service[\\s\\S]*?(HttpServletRequest|HttpServletResponse)\\s+\\w+"
+        custom:
+          rule_id: "EGOV-SVC-003"
+          fix: "Servlet 관련 로직은 Controller에서 처리하고 Service에는 비즈니스 데이터만 전달하세요"
+
+      - id: "egov-svc-004"
+        name: "ServiceImpl 과대 클래스"
+        severity: "medium"
+        category: "egov-standard"
+        description: "ServiceImpl 클래스의 메서드가 너무 많습니다. 도메인별로 분리하세요."
+        enabled: false  # quality-ast-009와 동일 검출 중복
+        pattern:
+          type: "ast-class"
+          name_pattern: ".*ServiceImpl$"
+        custom:
+          max_methods: 25
+          rule_id: "EGOV-SVC-004"
+          fix: "도메인별로 Service 클래스를 분리하세요 (단일 책임 원칙)"
+
+      # ==================== 3. Mapper/DAO 표준 ====================
+
+      - id: "egov-dao-001"
+        name: "DAO에서 EgovAbstractDAO 상속 (iBatis 잔존)"
+        severity: "high"
+        category: "egov-standard"
+        description: "EgovAbstractDAO는 iBatis 기반입니다. MyBatis의 EgovAbstractMapper로 변경하세요."
+        enabled: true  # mod-egov-003 비활성화 → 이 규칙이 대표
+        pattern:
+          type: "regex"
+          regex: "extends\\s+EgovAbstractDAO\\b"
+        custom:
+          rule_id: "EGOV-DAO-001"
+          fix: "EgovAbstractMapper를 상속하거나 @Mapper 인터페이스로 전환하세요"
+
+      - id: "egov-dao-002"
+        name: "DAO에서 직접 SQL 문자열 사용"
+        severity: "high"
+        category: "egov-standard"
+        description: "DAO에서 SQL을 직접 문자열로 작성하면 SQL Injection 위험이 있고 유지보수가 어렵습니다."
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "\"\\s*(SELECT|INSERT|UPDATE|DELETE)\\s+"
+        custom:
+          rule_id: "EGOV-DAO-002"
+          fix: "MyBatis XML Mapper를 사용하여 SQL을 관리하세요"
+
+      - id: "egov-dao-003"
+        name: "Mapper에서 @Select/@Insert 어노테이션 SQL"
+        severity: "medium"
+        category: "egov-standard"
+        description: "Mapper 인터페이스에 @Select 등으로 SQL을 직접 작성하면 관리가 어렵습니다. XML Mapper를 사용하세요."
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "@(Select|Insert|Update|Delete)\\s*\\("
+        custom:
+          rule_id: "EGOV-DAO-003"
+          fix: "MyBatis XML Mapper 파일에 SQL을 작성하세요 (전자정부프레임워크 표준)"
+
+      # ==================== 4. 공통 컴포넌트 활용 ====================
+
+      - id: "egov-common-001"
+        name: "직접 파일 업로드 구현"
+        severity: "medium"
+        category: "egov-common"
+        description: "파일 업로드는 전자정부프레임워크 공통 컴포넌트(EgovFileUploadUtil)를 활용하세요."
+        enabled: true
+        pattern:
+          type: "regex-multiline"
+          regex: "MultipartFile\\s+\\w+\\s*[,)].*\\n.*transferTo\\s*\\("
+        custom:
+          rule_id: "EGOV-COMMON-001"
+          fix: "전자정부프레임워크 파일 업로드 공통 컴포넌트를 활용하세요"
+
+      - id: "egov-common-002"
+        name: "직접 페이징 쿼리 구현"
+        severity: "low"
+        category: "egov-common"
+        description: "페이징은 전자정부프레임워크 페이징 공통 컴포넌트(EgovPaginationSQLiteDAO)를 활용하세요."
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "\\bROWNUM\\b.*<|\\bLIMIT\\s+\\d+"
+        custom:
+          rule_id: "EGOV-COMMON-002"
+          fix: "전자정부프레임워크 페이징 공통 컴포넌트를 활용하세요"
+
+      - id: "egov-common-003"
+        name: "직접 ID 생성 로직"
+        severity: "medium"
+        category: "egov-common"
+        description: "ID 생성은 전자정부프레임워크 ID Generation 서비스(EgovIdGnService)를 활용하세요."
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "UUID\\.randomUUID\\s*\\(\\s*\\)"
+        custom:
+          rule_id: "EGOV-COMMON-003"
+          fix: "EgovIdGnService를 사용하여 표준화된 ID를 생성하세요"
+
+      - id: "egov-common-004"
+        name: "직접 프로퍼티 파일 로딩"
+        severity: "low"
+        category: "egov-common"
+        description: "프로퍼티 파일은 전자정부프레임워크 Properties 서비스 또는 Spring @Value를 활용하세요."
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "new\\s+Properties\\s*\\(\\s*\\)"
+        custom:
+          rule_id: "EGOV-COMMON-004"
+          fix: "EgovProperties 또는 Spring @Value/@ConfigurationProperties를 사용하세요"
+
+      - id: "egov-common-005"
+        name: "직접 메일 발송 구현"
+        severity: "low"
+        category: "egov-common"
+        description: "메일 발송은 전자정부프레임워크 Mail 공통 컴포넌트를 활용하세요."
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "new\\s+MimeMessage\\s*\\(|Transport\\.send\\s*\\("
+        custom:
+          rule_id: "EGOV-COMMON-005"
+          fix: "전자정부프레임워크 Mail 공통 컴포넌트 또는 Spring JavaMailSender를 사용하세요"
+
+      # ==================== 5. 메서드 명명 표준 ====================
+
+      - id: "egov-method-001"
+        name: "조회 메서드 접두사 위반"
+        severity: "medium"
+        category: "method-naming"
+        description: "조회 메서드는 select*, get*, find* 접두사를 사용해야 합니다."
+        enabled: true
+        pattern:
+          type: "regex-multiline"
+          regex: "@(GetMapping|RequestMapping).*\\n\\s*public\\s+\\w+\\s+(?!(select|get|find|search|retrieve|view|download|check|is)\\w+)([a-z]\\w+)\\s*\\("
+        custom:
+          rule_id: "EGOV-METHOD-001"
+          fix: "조회 메서드: select*, get*, find* 접두사 사용"
+          example: "selectUserList(), getUserDetail(), findActiveUsers()"
+
+      - id: "egov-method-002"
+        name: "등록 메서드 접두사 위반"
+        severity: "medium"
+        category: "method-naming"
+        description: "등록 메서드는 insert*, add*, create*, register* 접두사를 사용해야 합니다."
+        enabled: true
+        pattern:
+          type: "regex-multiline"
+          regex: "@PostMapping.*\\n\\s*public\\s+\\w+\\s+(?!(insert|add|create|register|save|upload|send|process|exec)\\w+)([a-z]\\w+)\\s*\\("
+        custom:
+          rule_id: "EGOV-METHOD-002"
+          fix: "등록 메서드: insert*, add*, create* 접두사 사용"
+          example: "insertUser(), addBoardArticle(), createOrder()"
+
+      - id: "egov-method-003"
+        name: "수정 메서드 접두사 위반"
+        severity: "medium"
+        category: "method-naming"
+        description: "수정 메서드는 update*, modify*, change* 접두사를 사용해야 합니다."
+        enabled: true
+        pattern:
+          type: "regex-multiline"
+          regex: "@PutMapping.*\\n\\s*public\\s+\\w+\\s+(?!(update|modify|change|edit|set|reset)\\w+)([a-z]\\w+)\\s*\\("
+        custom:
+          rule_id: "EGOV-METHOD-003"
+          fix: "수정 메서드: update*, modify*, change* 접두사 사용"
+          example: "updateUser(), modifyBoard(), changePassword()"
+
+      - id: "egov-method-004"
+        name: "삭제 메서드 접두사 위반"
+        severity: "medium"
+        category: "method-naming"
+        description: "삭제 메서드는 delete*, remove*, cancel* 접두사를 사용해야 합니다."
+        enabled: true
+        pattern:
+          type: "regex-multiline"
+          regex: "@DeleteMapping.*\\n\\s*public\\s+\\w+\\s+(?!(delete|remove|cancel|withdraw|drop)\\w+)([a-z]\\w+)\\s*\\("
+        custom:
+          rule_id: "EGOV-METHOD-004"
+          fix: "삭제 메서드: delete*, remove* 접두사 사용"
+          example: "deleteUser(), removeBoard(), cancelOrder()"
+
+      # ==================== 6. 예외 처리 표준 ====================
+
+      - id: "egov-ex-001"
+        name: "EgovBizException 미사용"
+        severity: "medium"
+        category: "exception"
+        description: "비즈니스 예외는 EgovBizException을 사용하여 프레임워크 표준 예외 처리를 활용하세요."
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "throw\\s+new\\s+(Runtime|IllegalArgument|IllegalState)Exception\\s*\\("
+        custom:
+          rule_id: "EGOV-EX-001"
+          fix: "EgovBizException 또는 프로젝트 표준 BusinessException을 throw하세요"
+          example: "throw new EgovBizException(messageSource, \"fail.common.update\")"
+
+      - id: "egov-ex-002"
+        name: "Service에서 Exception 직접 throw"
+        severity: "medium"
+        category: "exception"
+        description: "Service 계층에서 checked Exception을 직접 throw하면 상위 계층에 불필요한 의존성이 전파됩니다."
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "throws\\s+(SQLException|IOException|ClassNotFoundException)"
+        custom:
+          rule_id: "EGOV-EX-002"
+          fix: "checked Exception은 Service에서 catch하여 EgovBizException으로 변환하세요"
+
+      - id: "egov-ex-003"
+        name: "Controller에서 throws Exception 선언"
+        severity: "medium"
+        category: "exception"
+        description: "Controller 메서드에 throws Exception을 선언하면 예외가 클라이언트에 그대로 노출될 수 있습니다."
+        enabled: true
+        pattern:
+          type: "regex-multiline"
+          regex: "@(GetMapping|PostMapping|PutMapping|DeleteMapping|RequestMapping).*\\n[^{]*throws\\s+Exception\\s*\\{"
+        custom:
+          rule_id: "EGOV-EX-003"
+          fix: "try-catch로 예외를 처리하거나 @ExceptionHandler를 사용하세요"
+
+      # ==================== 7. 로깅 표준 ====================
+
+      - id: "egov-log-001"
+        name: "System.out/err 사용"
+        severity: "high"
+        category: "logging"
+        description: "System.out/err 대신 SLF4J Logger를 사용하세요. 전자정부프레임워크는 egovLogger를 제공합니다."
+        enabled: false  # quality-lg-001, secure-debug-001과 동일 검출 중복
+        pattern:
+          type: "regex"
+          regex: "System\\.(out|err)\\.(print|println|printf)"
+        custom:
+          rule_id: "EGOV-LOG-001"
+          fix: "egovLogger 또는 LoggerFactory.getLogger()를 사용하세요"
+
+      - id: "egov-log-002"
+        name: "Logger 문자열 연결 사용"
+        severity: "medium"
+        category: "logging"
+        description: "Logger 호출 시 문자열 연결(+)은 성능에 불리합니다. {} 플레이스홀더를 사용하세요."
+        enabled: false  # quality-lg-005와 동일 검출 중복
+        pattern:
+          type: "regex"
+          regex: "\\b(log|logger|egovLogger|LOGGER)\\.(debug|info|warn|error)\\s*\\([^)]*\\+"
+        custom:
+          rule_id: "EGOV-LOG-002"
+          fix: "log.info(\"사용자: {}\", userId)와 같이 {} 플레이스홀더를 사용하세요"
+
+      - id: "egov-log-003"
+        name: "e.printStackTrace() 사용"
+        severity: "high"
+        category: "logging"
+        description: "printStackTrace()는 로그 파일이 아닌 System.err로 출력됩니다. Logger를 사용하세요."
+        enabled: false  # secure-err-001과 동일 검출 중복
+        pattern:
+          type: "regex"
+          regex: "\\.printStackTrace\\s*\\(\\s*\\)"
+        custom:
+          rule_id: "EGOV-LOG-003"
+          fix: "logger.error(\"message\", e)를 사용하세요"
+
+      # ==================== 8. 보안 표준 ====================
+
+      - id: "egov-sec-001"
+        name: "XSS 필터 미적용"
+        severity: "high"
+        category: "security"
+        description: "외부 입력값을 HTML에 출력할 때 XSS 필터링이 필요합니다."
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "request\\.getParameter\\s*\\([^)]*\\)"
+        custom:
+          rule_id: "EGOV-SEC-001"
+          fix: "EgovWebUtil.clearXSSMinimum() 또는 HTML 인코딩을 적용하세요"
+
+      - id: "egov-sec-002"
+        name: "SQL Injection 취약 패턴"
+        severity: "critical"
+        category: "security"
+        description: "SQL 문자열에 외부 입력값을 직접 연결하면 SQL Injection에 취약합니다."
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "\"(SELECT|INSERT|UPDATE|DELETE)\\s[^\"]*\"\\s*\\+\\s*\\w+"
+        custom:
+          rule_id: "EGOV-SEC-002"
+          fix: "PreparedStatement의 바인드 변수(?) 또는 MyBatis #{} 를 사용하세요"
+
+  - language: xml
+    rules:
+      # ==================== 9. MyBatis XML 표준 ====================
+
+      - id: "egov-mybatis-001"
+        name: "Mapper XML namespace 누락"
+        severity: "high"
+        category: "mybatis"
+        description: "MyBatis Mapper XML에는 namespace가 반드시 지정되어야 합니다."
+        enabled: false  # quality-mb-201과 동일 검출 중복
+        pattern:
+          type: "regex"
+          regex: "<mapper\\s+(?!.*namespace)"
+        custom:
+          rule_id: "EGOV-MYBATIS-001"
+          fix: "<mapper namespace=\"패키지.인터페이스명\">을 지정하세요"
+
+      - id: "egov-mybatis-002"
+        name: "MyBatis에서 ${} 사용"
+        severity: "critical"
+        category: "mybatis"
+        description: "${} 구문은 SQL Injection에 취약합니다. #{} 바인드 변수를 사용하세요."
+        enabled: false  # secure-sql-003, sql-mybatis-001과 동일 regex 중복
+        pattern:
+          type: "regex"
+          regex: "\\$\\{[^}]+\\}"
+        custom:
+          rule_id: "EGOV-MYBATIS-002"
+          fix: "#{variable} 형식으로 변경하세요. 테이블명/컬럼명이 동적인 경우만 ${}를 사용하고, 화이트리스트 검증을 추가하세요."
+
+      - id: "egov-mybatis-003"
+        name: "MyBatis SELECT * 사용"
+        severity: "medium"
+        category: "mybatis"
+        description: "SELECT *는 불필요한 컬럼까지 조회하여 성능에 불리합니다."
+        enabled: false  # sql-mybatis-002, sql-sel-001과 동일 검출 중복
+        pattern:
+          type: "regex"
+          regex: "SELECT\\s+\\*\\s+FROM"
+        custom:
+          rule_id: "EGOV-MYBATIS-003"
+          fix: "필요한 컬럼만 명시적으로 나열하세요"

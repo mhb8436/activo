@@ -2,6 +2,7 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { MCPServerConfig } from "../config.js";
 import { Tool, ToolResult } from "../tools/types.js";
+import { logMCP } from "./logger.js";
 
 export interface MCPConnection {
   id: string;
@@ -75,6 +76,7 @@ export class MCPManager {
   async callTool(connectionId: string, toolName: string, args: Record<string, unknown>): Promise<ToolResult> {
     const connection = this.connections.get(connectionId);
     if (!connection) {
+      logMCP({ level: "error", server_id: connectionId, event: "call_tool", message: `Connection not found: ${connectionId}` });
       return {
         success: false,
         content: "",
@@ -89,6 +91,7 @@ export class MCPManager {
       });
 
       if (result.isError) {
+        logMCP({ level: "error", server_id: connectionId, event: "call_tool", message: `Tool '${toolName}' returned error`, details: result.content });
         return {
           success: false,
           content: "",
@@ -102,11 +105,15 @@ export class MCPManager {
         .map((c) => c.text!)
         .join("\n");
 
+      logMCP({ level: "info", server_id: connectionId, event: "call_tool", message: `Tool '${toolName}' succeeded (${content.length} chars)` });
+
       return {
         success: true,
         content,
       };
     } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      logMCP({ level: "error", server_id: connectionId, event: "call_tool", message: `Tool '${toolName}' threw: ${errorMsg}` });
       return {
         success: false,
         content: "",
@@ -129,6 +136,18 @@ export class MCPManager {
 
   isConnected(id: string): boolean {
     return this.connections.has(id);
+  }
+
+  getMCPStatus(): Array<{ id: string; connected: boolean; toolCount: number }> {
+    return Array.from(this.connections.entries()).map(([id, conn]) => ({
+      id,
+      connected: true,
+      toolCount: conn.tools.length,
+    }));
+  }
+
+  getConnectionIds(): string[] {
+    return Array.from(this.connections.keys());
   }
 }
 

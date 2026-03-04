@@ -5,6 +5,7 @@ interface ToolCall {
   tool: string;
   status: "running" | "complete" | "error";
   result?: string;
+  detail?: string;
 }
 
 interface Message {
@@ -17,7 +18,7 @@ interface MessageListProps {
   messages: Message[];
 }
 
-export function MessageList({ messages }: MessageListProps): React.ReactElement {
+export const MessageList = React.memo(function MessageList({ messages }: MessageListProps): React.ReactElement {
   if (messages.length === 0) {
     return (
       <Box marginY={1}>
@@ -33,7 +34,7 @@ export function MessageList({ messages }: MessageListProps): React.ReactElement 
       ))}
     </Box>
   );
-}
+});
 
 function MessageItem({ message }: { message: Message }): React.ReactElement {
   const isUser = message.role === "user";
@@ -56,6 +57,9 @@ function MessageItem({ message }: { message: Message }): React.ReactElement {
                 {tc.status === "running" ? "🔄" : tc.status === "complete" ? "✓" : "✗"}{" "}
               </Text>
               <Text color={tc.status === "error" ? "red" : "yellow"}>{tc.tool}</Text>
+              {tc.detail && (
+                <Text color="gray"> ({tc.detail})</Text>
+              )}
               {tc.status === "complete" && tc.result && (
                 <Text color="gray"> - {truncate(tc.result, 50)}</Text>
               )}

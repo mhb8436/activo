@@ -22,7 +22,8 @@ program
   .option("-p, --print", "Non-interactive mode (print and exit)")
   .option("--headless", "Headless mode for CI/CD")
   .option("--resume", "Resume from last session")
-  .option("--model <model>", "Specify Ollama model")
+  .option("--model <model>", "Specify model (e.g., qwen2.5:7b, anthropic:claude-sonnet-4-20250514)")
+  .option("--provider <provider>", "LLM provider: ollama or anthropic")
   .argument("[prompt]", "Initial prompt")
   .action(async (prompt, options) => {
     // Show ASCII banner
@@ -31,8 +32,30 @@ program
     // Load config
     const config = loadConfig();
 
+    // --provider flag
+    if (options.provider) {
+      if (options.provider === "ollama" || options.provider === "anthropic") {
+        config.provider = options.provider;
+        // Propagate to tool handlers via env (they call loadConfig() independently)
+        process.env.ACTIVO_PROVIDER = options.provider;
+      }
+    }
+
+    // --model flag with provider:model parsing
     if (options.model) {
-      config.ollama.model = options.model;
+      const modelInput: string = options.model;
+      if (modelInput.startsWith("anthropic:")) {
+        config.provider = "anthropic";
+        config.anthropic.model = modelInput.slice("anthropic:".length);
+      } else if (modelInput.startsWith("ollama:")) {
+        config.provider = "ollama";
+        config.ollama.model = modelInput.slice("ollama:".length);
+      } else if (modelInput.startsWith("claude-") || modelInput.startsWith("claude3")) {
+        config.provider = "anthropic";
+        config.anthropic.model = modelInput;
+      } else {
+        config.ollama.model = modelInput;
+      }
     }
 
     // Headless/print mode

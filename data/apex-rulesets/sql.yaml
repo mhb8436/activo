@@ -1,0 +1,1660 @@
+# SQL Style Guide Ruleset (ANSI SQL Common)
+# DB 벤더 불문 공통 SQL 규칙
+# Oracle 전용 규칙은 sql-oracle.yaml, 포맷 규칙은 sql-format.yaml 참조
+version: "1.0"
+profile: "sql"
+
+languages:
+  - language: sql
+    rules:
+      # ==================== 1. SQL 작성 기본 ====================
+
+      - id: "sql-fmt-004"
+        name: "괄호 내 공백"
+        severity: "low"
+        category: "format"
+        description: "괄호 안에 불필요한 공백이 있습니다."
+        enabled: false
+        pattern:
+          type: "regex"
+          regex: "\\(\\s+\\w|\\w\\s+\\)"
+        custom:
+          rule_id: "SQL-FMT-004"
+
+      - id: "sql-fmt-005"
+        name: "연산자 공백 누락"
+        severity: "low"
+        category: "format"
+        description: "연산자 앞뒤에 공백이 필요합니다."
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "\\w[=!<>]+\\w"
+        custom:
+          rule_id: "SQL-FMT-005"
+
+      - id: "sql-cmt-001"
+        name: "한줄 주석 사용"
+        severity: "high"
+        category: "comment"
+        description: "-- 주석 대신 /* */ 주석을 사용하세요."
+        enabled: false
+        pattern:
+          type: "regex"
+          regex: "--(?!\\+)"
+        custom:
+          rule_id: "SQL-CMT-001"
+
+      # ==================== 2. SELECT 문 ====================
+
+      - id: "sql-sel-001"
+        name: "SELECT * 사용"
+        severity: "critical"
+        category: "select"
+        description: "SELECT * 대신 필요한 컬럼만 명시하세요."
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "\\bSELECT\\s+\\*\\s+FROM\\b"
+          flags: "i"
+        custom:
+          rule_id: "SQL-SEL-001"
+
+      - id: "sql-sel-002"
+        name: "컬럼 별칭 누락"
+        severity: "low"
+        category: "select"
+        description: "함수 사용 시 별칭을 지정하세요."
+        enabled: true
+        pattern:
+          type: "method-analysis"
+          conditions:
+            - "function-column-without-alias"
+        custom:
+          rule_id: "SQL-SEL-002"
+
+      - id: "sql-sel-003"
+        name: "DISTINCT 남용"
+        severity: "high"
+        category: "select"
+        description: "유일성이 보장되는 경우 불필요한 DISTINCT를 제거하세요."
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "\\bSELECT\\s+DISTINCT\\b"
+          flags: "i"
+        custom:
+          rule_id: "SQL-SEL-003"
+          note: "코드 리뷰 필요"
+
+      - id: "sql-sel-005"
+        name: "함수 내 콤마 앞 공백"
+        severity: "low"
+        category: "select"
+        description: "함수 내 콤마는 뒤에만 공백을 사용합니다."
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "\\w+\\s*\\([^)]*\\s+,"
+        custom:
+          rule_id: "SQL-SEL-005"
+
+      # ==================== 3. FROM 절 ====================
+
+      - id: "sql-from-001"
+        name: "테이블 오너 누락"
+        severity: "high"
+        category: "from"
+        description: "테이블명은 테이블오너명.테이블명 형식으로 기술하세요."
+        enabled: false  # 현장에서 DataSource 레벨 스키마 설정이 일반적
+        pattern:
+          type: "regex"
+          regex: "\\bFROM\\s+(?![A-Z_]+\\.)[A-Z_]+(?:\\s+[A-Z])?\\b"
+          flags: "i"
+        custom:
+          rule_id: "SQL-FROM-001"
+
+      - id: "sql-from-003"
+        name: "복수 테이블 별칭 누락"
+        severity: "high"
+        category: "from"
+        description: "테이블이 2개 이상인 경우 별칭이 필수입니다."
+        enabled: true
+        pattern:
+          type: "method-analysis"
+          conditions:
+            - "multiple-tables-without-alias"
+        custom:
+          rule_id: "SQL-FROM-003"
+
+      # ==================== 4. WHERE 절 ====================
+
+      - id: "sql-where-002"
+        name: "묵시적 형변환"
+        severity: "critical"
+        category: "where"
+        description: "NUMBER 컬럼에 문자열 비교는 묵시적 형변환을 유발합니다."
+        enabled: true
+        pattern:
+          type: "method-analysis"
+          conditions:
+            - "implicit-type-conversion"
+        custom:
+          rule_id: "SQL-WHERE-002"
+
+      - id: "sql-where-003"
+        name: "조인 조건 누락"
+        severity: "critical"
+        category: "where"
+        description: "조인 조건이 누락되면 Cartesian Product가 발생합니다."
+        enabled: true
+        pattern:
+          type: "method-analysis"
+          conditions:
+            - "missing-join-condition"
+        custom:
+          rule_id: "SQL-WHERE-003"
+
+      - id: "sql-where-004"
+        name: "바인드 변수 미사용"
+        severity: "critical"
+        category: "where"
+        description: "리터럴 값 대신 바인드 변수를 사용하세요."
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "\\bWHERE[^;]*=\\s*'[^#]"
+          flags: "i"
+        custom:
+          rule_id: "SQL-WHERE-004"
+
+      - id: "sql-where-005"
+        name: "부정형 조건 남용"
+        severity: "high"
+        category: "where"
+        description: "부정형 조건(<>, !=, NOT IN)은 인덱스를 사용할 수 없습니다."
+        enabled: false
+        pattern:
+          type: "regex"
+          regex: "\\bWHERE[^;]*((<>|!=)|NOT\\s+IN)\\b"
+          flags: "i"
+        custom:
+          rule_id: "SQL-WHERE-005"
+
+      - id: "sql-where-006"
+        name: "OR 조건 남용"
+        severity: "high"
+        category: "where"
+        description: "OR 조건은 검색 범위를 확대시킵니다."
+        enabled: true
+        pattern:
+          type: "method-analysis"
+          conditions:
+            - "excessive-or-conditions"
+        custom:
+          rule_id: "SQL-WHERE-006"
+
+      - id: "sql-where-008"
+        name: "선행 와일드카드"
+        severity: "high"
+        category: "where"
+        description: "LIKE '%문자열' 패턴은 인덱스를 사용할 수 없습니다."
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "\\bLIKE\\s+['\"]%"
+          flags: "i"
+        custom:
+          rule_id: "SQL-WHERE-008"
+
+      # ==================== 5. ORDER BY / GROUP BY (4개) ====================
+
+      - id: "sql-order-001"
+        name: "컬럼 순서값 사용"
+        severity: "high"
+        category: "orderby"
+        description: "ORDER BY에서 컬럼 순서값 대신 컬럼명을 사용하세요."
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "\\bORDER\\s+BY\\s+\\d+"
+          flags: "i"
+        custom:
+          rule_id: "SQL-ORDER-001"
+
+      - id: "sql-order-002"
+        name: "정렬 ORDER BY 누락"
+        severity: "high"
+        category: "orderby"
+        description: "정렬이 필요한 경우 ORDER BY를 명시하세요."
+        enabled: true
+        pattern:
+          type: "method-analysis"
+          conditions:
+            - "sorting-required-without-orderby"
+        custom:
+          rule_id: "SQL-ORDER-002"
+
+      - id: "sql-page-002"
+        name: "페이징 정렬 누락"
+        severity: "critical"
+        category: "paging"
+        description: "페이징 쿼리에서 ORDER BY가 누락되었습니다."
+        enabled: true
+        pattern:
+          type: "method-analysis"
+          conditions:
+            - "paging-without-orderby"
+        custom:
+          rule_id: "SQL-PAGE-002"
+
+      # ==================== 6. DML 문 (5개) ====================
+
+      - id: "sql-dml-001"
+        name: "DML 테이블 오너 누락"
+        severity: "high"
+        category: "dml"
+        description: "UPDATE/INSERT/DELETE 시 테이블 오너를 기술하세요."
+        enabled: false  # 현장에서 DataSource 레벨 스키마 설정이 일반적
+        pattern:
+          type: "regex"
+          regex: "\\b(UPDATE|INSERT\\s+INTO|DELETE\\s+FROM)\\s+(?![A-Z_]+\\.)[A-Z_]+\\b"
+          flags: "i"
+        custom:
+          rule_id: "SQL-DML-001"
+
+      - id: "sql-dml-002"
+        name: "MERGE DELETE 사용"
+        severity: "high"
+        category: "dml"
+        description: "MERGE 문에서 DELETE는 사용을 제한합니다."
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "\\bMERGE[^;]*DELETE\\b"
+          flags: "i"
+        custom:
+          rule_id: "SQL-DML-002"
+
+      - id: "sql-dml-003"
+        name: "INSERT 컬럼 누락"
+        severity: "high"
+        category: "dml"
+        description: "INSERT 문에 컬럼 목록을 명시하세요."
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "\\bINSERT\\s+INTO\\s+[A-Z_\\.]+\\s+VALUES\\b"
+          flags: "i"
+        custom:
+          rule_id: "SQL-DML-003"
+
+      - id: "sql-dml-004"
+        name: "UPDATE WHERE 누락"
+        severity: "critical"
+        category: "dml"
+        description: "UPDATE 문에 WHERE 절이 없으면 모든 행이 수정됩니다."
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "\\bUPDATE\\s+[A-Z_\\.]+\\s+SET[^;]+(?!WHERE)"
+          flags: "i"
+        custom:
+          rule_id: "SQL-DML-004"
+
+      - id: "sql-dml-005"
+        name: "DELETE WHERE 누락"
+        severity: "critical"
+        category: "dml"
+        description: "DELETE 문에 WHERE 절이 없으면 모든 행이 삭제됩니다."
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "\\bDELETE\\s+FROM\\s+[A-Z_\\.]+\\s*(?!WHERE)"
+          flags: "i"
+        custom:
+          rule_id: "SQL-DML-005"
+
+      # ==================== 7. 서브쿼리 (5개) ====================
+
+      - id: "sql-sub-001"
+        name: "스칼라 서브쿼리 남용"
+        severity: "high"
+        category: "subquery"
+        description: "스칼라 서브쿼리는 코드 테이블 조회에만 사용하세요."
+        enabled: true
+        pattern:
+          type: "method-analysis"
+          conditions:
+            - "scalar-subquery-not-for-code-table"
+        custom:
+          rule_id: "SQL-SUB-001"
+
+      - id: "sql-sub-002"
+        name: "스칼라 GROUP BY"
+        severity: "high"
+        category: "subquery"
+        description: "스칼라 서브쿼리 내에서 GROUP BY 사용을 금지합니다."
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "\\bSELECT\\s*\\([^)]*SELECT[^)]*GROUP\\s+BY"
+          flags: "i"
+        custom:
+          rule_id: "SQL-SUB-002"
+
+      - id: "sql-sub-003"
+        name: "스칼라 집계함수"
+        severity: "high"
+        category: "subquery"
+        description: "스칼라 서브쿼리 내에서 집계함수 사용을 금지합니다."
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "\\bSELECT\\s*\\([^)]*SELECT[^)]*(SUM|AVG|COUNT|MAX|MIN)\\s*\\("
+          flags: "i"
+        custom:
+          rule_id: "SQL-SUB-003"
+
+      - id: "sql-sub-004"
+        name: "별칭 중복"
+        severity: "high"
+        category: "subquery"
+        description: "메인/서브쿼리 간 별칭이 중복됩니다."
+        enabled: true
+        pattern:
+          type: "method-analysis"
+          conditions:
+            - "duplicate-alias-main-sub"
+        custom:
+          rule_id: "SQL-SUB-004"
+
+      - id: "sql-sub-005"
+        name: "괄호 정렬 불량"
+        severity: "low"
+        category: "subquery"
+        description: "서브쿼리 괄호 정렬이 미준수됩니다."
+        enabled: true
+        pattern:
+          type: "method-analysis"
+          conditions:
+            - "subquery-bracket-misaligned"
+        custom:
+          rule_id: "SQL-SUB-005"
+
+      # ==================== 8. SQL 활용 ====================
+
+      - id: "sql-set-001"
+        name: "동일 테이블 UNION ALL"
+        severity: "high"
+        category: "set"
+        description: "동일 테이블에 UNION ALL 사용은 조건절로 해결하세요."
+        enabled: true
+        pattern:
+          type: "method-analysis"
+          conditions:
+            - "same-table-union-all"
+        custom:
+          rule_id: "SQL-SET-001"
+
+      - id: "sql-set-002"
+        name: "MINUS 대신 NOT EXISTS"
+        severity: "low"
+        category: "set"
+        description: "MINUS 대신 NOT EXISTS를 사용하세요."
+        enabled: false  # MINUS는 가독성이 좋고 실무에서 일반적으로 사용됨
+        pattern:
+          type: "regex"
+          regex: "\\bMINUS\\b"
+          flags: "i"
+        custom:
+          rule_id: "SQL-SET-002"
+
+      - id: "sql-set-003"
+        name: "INTERSECT 대신 EXISTS"
+        severity: "low"
+        category: "set"
+        description: "INTERSECT 대신 EXISTS/JOIN을 사용하세요."
+        enabled: false  # INTERSECT는 가독성이 좋고 실무에서 일반적으로 사용됨
+        pattern:
+          type: "regex"
+          regex: "\\bINTERSECT\\b"
+          flags: "i"
+        custom:
+          rule_id: "SQL-SET-003"
+
+      # ==================== 9. 제약 사항 (10개) ====================
+
+      - id: "sql-obj-001"
+        name: "UDF 사용"
+        severity: "critical"
+        category: "restriction"
+        description: "사용자 정의 함수(UDF) 사용은 금지됩니다."
+        enabled: true
+        pattern:
+          type: "method-analysis"
+          conditions:
+            - "using-user-defined-function"
+        custom:
+          rule_id: "SQL-OBJ-001"
+
+      - id: "sql-obj-002"
+        name: "Trigger 사용"
+        severity: "critical"
+        category: "restriction"
+        description: "트리거 사용은 원칙적으로 금지됩니다."
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "\\bCREATE\\s+(OR\\s+REPLACE\\s+)?TRIGGER\\b"
+          flags: "i"
+        custom:
+          rule_id: "SQL-OBJ-002"
+
+      - id: "sql-obj-003"
+        name: "Procedure 사용"
+        severity: "critical"
+        category: "restriction"
+        description: "프로시저 사용은 원칙적으로 금지됩니다."
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "\\bCREATE\\s+(OR\\s+REPLACE\\s+)?PROCEDURE\\b"
+          flags: "i"
+        custom:
+          rule_id: "SQL-OBJ-003"
+
+      - id: "sql-obj-004"
+        name: "DB LINK 사용"
+        severity: "critical"
+        category: "restriction"
+        description: "DB LINK 사용은 원칙적으로 금지됩니다."
+        enabled: false
+        pattern:
+          type: "regex"
+          regex: "@[A-Z_]+"
+          flags: "i"
+        custom:
+          rule_id: "SQL-OBJ-004"
+
+      - id: "sql-lock-001"
+        name: "FOR UPDATE 남용"
+        severity: "critical"
+        category: "lock"
+        description: "일반 조회에서 FOR UPDATE 사용은 금지됩니다."
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "\\bFOR\\s+UPDATE(?!\\s+NOWAIT)\\b"
+          flags: "i"
+        custom:
+          rule_id: "SQL-LOCK-001"
+
+      - id: "sql-with-001"
+        name: "WITH 절 무분별 사용"
+        severity: "low"
+        category: "restriction"
+        description: "WITH 절은 동일 서브쿼리 반복 시에만 사용하세요."
+        enabled: false  # WITH(CTE)는 가독성 향상에 유용하여 현장에서 권장됨
+        pattern:
+          type: "regex"
+          regex: "^\\s*WITH\\s+\\w+\\s+AS\\b"
+          flags: "im"
+        custom:
+          rule_id: "SQL-WITH-001"
+
+      - id: "sql-with-002"
+        name: "WITH 미래핑"
+        severity: "critical"
+        category: "restriction"
+        description: "MyBatis에서 WITH 절은 인라인뷰로 감싸야 합니다."
+        enabled: true
+        pattern:
+          type: "method-analysis"
+          conditions:
+            - "with-clause-not-wrapped"
+        custom:
+          rule_id: "SQL-WITH-002"
+
+      - id: "sql-null-001"
+        name: "IS NULL 조건"
+        severity: "high"
+        category: "performance"
+        description: "인덱스 컬럼에 IS NULL 조건은 인덱스를 사용할 수 없습니다."
+        enabled: false
+        pattern:
+          type: "regex"
+          regex: "\\bWHERE[^;]*\\w+\\.\\w+\\s+IS\\s+NULL\\b"
+          flags: "i"
+        custom:
+          rule_id: "SQL-NULL-001"
+
+      # ==================== 10. SQL 냄새 (Code Smell) 규칙 ====================
+
+      - id: "sql-smell-001"
+        name: "NOT IN (SELECT ...) 사용"
+        severity: "high"
+        category: "performance"
+        description: "NOT IN (SELECT ...)는 NULL 처리 문제와 성능 저하를 유발합니다. NOT EXISTS를 사용하세요."
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "\\bNOT\\s+IN\\s*\\(\\s*SELECT\\b"
+          flags: "i"
+        custom:
+          rule_id: "SQL-SMELL-001"
+          fix: "NOT EXISTS (SELECT 1 FROM ... WHERE ...) 패턴으로 변경하세요"
+
+      - id: "sql-smell-002"
+        name: "UNION (중복 제거) 사용"
+        severity: "high"
+        category: "performance"
+        description: "UNION은 내부적으로 SORT UNIQUE를 수행합니다. 중복이 없다면 UNION ALL을 사용하세요."
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "\\bUNION\\b(?!\\s+ALL)"
+          flags: "i"
+        custom:
+          rule_id: "SQL-SMELL-002"
+          fix: "중복 가능성이 없다면 UNION ALL로 변경하세요"
+
+      - id: "sql-smell-004"
+        name: "쿼리 라인 수 과다"
+        severity: "high"
+        category: "maintainability"
+        description: "SQL이 100라인을 초과합니다. 쿼리를 분리하거나 WITH절로 가독성을 개선하세요."
+        enabled: true
+        pattern:
+          type: "method-analysis"
+          conditions:
+            - "query-length-excessive"
+        custom:
+          rule_id: "SQL-SMELL-004"
+          max_lines: 100
+
+      - id: "sql-smell-005"
+        name: "CASE WHEN 분기 과다"
+        severity: "high"
+        category: "maintainability"
+        description: "CASE WHEN 분기가 10개를 초과합니다. 매핑 테이블이나 별도 로직으로 분리하세요."
+        enabled: true
+        pattern:
+          type: "method-analysis"
+          conditions:
+            - "case-when-excessive-branches"
+        custom:
+          rule_id: "SQL-SMELL-005"
+          max_branches: 10
+
+      - id: "sql-smell-006"
+        name: "AST JOIN 테이블 수 과다"
+        severity: "high"
+        category: "maintainability"
+        description: "JOIN 테이블이 7개를 초과합니다. 쿼리를 분리하거나 뷰를 활용하세요."
+        enabled: true
+        pattern:
+          type: "ast-sql-table"
+          conditions:
+            - "table-count-excessive"
+        custom:
+          rule_id: "SQL-SMELL-006"
+          max_tables: 7
+
+      - id: "sql-smell-007"
+        name: "AST LEFT JOIN 과다"
+        severity: "high"
+        category: "maintainability"
+        description: "LEFT JOIN이 5개를 초과합니다. 불필요한 LEFT JOIN을 검토하세요."
+        enabled: true
+        pattern:
+          type: "ast-sql-join"
+          conditions:
+            - "left-join-excessive"
+        custom:
+          rule_id: "SQL-SMELL-007"
+          max_left_joins: 5
+
+      - id: "sql-smell-008"
+        name: "AST SELECT 컬럼 수 과다"
+        severity: "high"
+        category: "maintainability"
+        description: "SELECT 컬럼이 30개를 초과합니다. 필요한 컬럼만 선택하세요."
+        enabled: true
+        pattern:
+          type: "ast-sql-select"
+          conditions:
+            - "column-count-excessive"
+        custom:
+          rule_id: "SQL-SMELL-008"
+          max_columns: 30
+
+      - id: "sql-smell-009"
+        name: "AST 스칼라 서브쿼리 과다"
+        severity: "high"
+        category: "performance"
+        description: "SELECT 절에 스칼라 서브쿼리가 2개를 초과합니다. JOIN으로 변환하세요."
+        enabled: true
+        pattern:
+          type: "ast-sql-subquery"
+          conditions:
+            - "scalar-subquery-excessive"
+        custom:
+          rule_id: "SQL-SMELL-009"
+          max_scalar_subqueries: 2
+
+      - id: "sql-smell-010"
+        name: "NULL = 비교"
+        severity: "high"
+        category: "correctness"
+        description: "col = NULL은 항상 UNKNOWN을 반환합니다. IS NULL / IS NOT NULL을 사용하세요."
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "\\b\\w+\\s*(?:=|!=|<>)\\s*NULL\\b"
+          flags: "i"
+        custom:
+          rule_id: "SQL-SMELL-010"
+          fix: "= NULL 대신 IS NULL, != NULL 대신 IS NOT NULL을 사용하세요"
+
+      - id: "sql-smell-011"
+        name: "NATURAL JOIN 사용"
+        severity: "high"
+        category: "maintainability"
+        description: "NATURAL JOIN은 컬럼 추가 시 조인 조건이 암묵적으로 변경되어 위험합니다."
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "\\bNATURAL\\s+JOIN\\b"
+          flags: "i"
+        custom:
+          rule_id: "SQL-SMELL-011"
+          fix: "명시적 JOIN ... ON 조건을 사용하세요"
+
+      - id: "sql-smell-012"
+        name: "ON 1=1 가짜 조인"
+        severity: "high"
+        category: "correctness"
+        description: "ON 1=1은 Cartesian Product를 조인처럼 위장한 코드입니다."
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "\\bON\\s+1\\s*=\\s*1\\b"
+          flags: "i"
+        custom:
+          rule_id: "SQL-SMELL-012"
+          fix: "실제 조인 조건을 명시하거나 CROSS JOIN을 사용하세요"
+
+      - id: "sql-smell-013"
+        name: "자기 자신 별칭"
+        severity: "low"
+        category: "maintainability"
+        description: "COL AS COL은 무의미한 별칭입니다. 코드 정리가 필요합니다."
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "\\b(\\w+)\\s+AS\\s+\\1\\b"
+          flags: "i"
+        custom:
+          rule_id: "SQL-SMELL-013"
+          fix: "불필요한 AS 별칭을 제거하세요"
+
+      - id: "sql-smell-017"
+        name: "COUNT(DISTINCT) 주의"
+        severity: "low"
+        category: "performance"
+        description: "COUNT(DISTINCT)는 대량 데이터에서 정렬/해시 비용이 큽니다. JOIN 문제를 의심하세요."
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "\\bCOUNT\\s*\\(\\s*DISTINCT\\b"
+          flags: "i"
+        custom:
+          rule_id: "SQL-SMELL-017"
+          fix: "JOIN 조건 또는 데이터 구조를 재검토하세요"
+
+      - id: "sql-smell-018"
+        name: "WHERE 1=1 항상 참"
+        severity: "low"
+        category: "maintainability"
+        description: "WHERE 1=1은 동적 SQL의 흔적입니다. 코드 정리가 필요합니다."
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "\\bWHERE\\s+1\\s*=\\s*1\\b"
+          flags: "i"
+        custom:
+          rule_id: "SQL-SMELL-018"
+          fix: "동적 SQL 생성 로직을 개선하여 WHERE 1=1을 제거하세요"
+
+      # ==================== 10-2. SQL 냄새 멀티라인 규칙 ====================
+
+      - id: "sql-smell-020"
+        name: "DISTINCT + GROUP BY 중복"
+        severity: "high"
+        category: "performance"
+        description: "SELECT DISTINCT와 GROUP BY를 동시에 사용하면 불필요한 중복 정렬이 발생합니다."
+        enabled: true
+        pattern:
+          type: "regex-multiline"
+          regex: "\\bSELECT\\s+DISTINCT\\b[\\s\\S]*?\\bGROUP\\s+BY\\b"
+          flags: "i"
+        custom:
+          rule_id: "SQL-SMELL-020"
+          fix: "GROUP BY만으로 유일성이 보장됩니다. DISTINCT를 제거하세요"
+
+      - id: "sql-smell-021"
+        name: "INSERT INTO ... ORDER BY"
+        severity: "high"
+        category: "performance"
+        description: "INSERT INTO 문에 ORDER BY는 무의미한 정렬 비용을 유발합니다."
+        enabled: true
+        pattern:
+          type: "regex-multiline"
+          regex: "\\bINSERT\\s+INTO\\b[\\s\\S]*?\\bORDER\\s+BY\\b"
+          flags: "i"
+        custom:
+          rule_id: "SQL-SMELL-021"
+          fix: "INSERT 문에서 ORDER BY를 제거하세요"
+
+      - id: "sql-smell-023"
+        name: "DISTINCT + JOIN 조합"
+        severity: "high"
+        category: "maintainability"
+        description: "SELECT DISTINCT와 JOIN을 함께 사용하면 잘못된 JOIN 중복을 숨기는 패턴일 수 있습니다."
+        enabled: true
+        pattern:
+          type: "regex-multiline"
+          regex: "\\bSELECT\\s+DISTINCT\\b[\\s\\S]*?\\bJOIN\\b"
+          flags: "i"
+        custom:
+          rule_id: "SQL-SMELL-023"
+          fix: "JOIN 조건을 재검토하여 DISTINCT 없이 올바른 결과가 나오는지 확인하세요"
+
+      - id: "sql-smell-024"
+        name: "LEFT JOIN + COUNT(*)"
+        severity: "high"
+        category: "correctness"
+        description: "LEFT JOIN과 COUNT(*)를 함께 사용하면 NULL 행까지 카운트됩니다."
+        enabled: true
+        pattern:
+          type: "regex-multiline"
+          regex: "\\bCOUNT\\s*\\(\\s*\\*\\s*\\)[\\s\\S]*?\\bLEFT\\s+(?:OUTER\\s+)?JOIN\\b"
+          flags: "i"
+        custom:
+          rule_id: "SQL-SMELL-024"
+          fix: "COUNT(컬럼명)을 사용하여 NULL이 아닌 행만 카운트하세요"
+
+      - id: "sql-smell-025"
+        name: "동일 컬럼 다중 OR"
+        severity: "low"
+        category: "maintainability"
+        description: "같은 컬럼에 대한 OR 비교는 IN 절로 변환하면 가독성이 향상됩니다."
+        enabled: true
+        pattern:
+          type: "regex-multiline"
+          regex: "(\\w+\\.\\w+)\\s*=\\s*'[^']*'\\s+OR\\s+\\1\\s*=\\s*'[^']*'"
+          flags: "i"
+        custom:
+          rule_id: "SQL-SMELL-025"
+          fix: "COL='A' OR COL='B' 대신 COL IN ('A','B')로 변경하세요"
+
+      - id: "sql-smell-026"
+        name: "중첩 CTE"
+        severity: "high"
+        category: "maintainability"
+        description: "WITH 절 안에 WITH가 중첩되어 있습니다. 순차 CTE로 풀어야 합니다."
+        enabled: true
+        pattern:
+          type: "regex-multiline"
+          regex: "\\bWITH\\b[\\s\\S]*?\\bAS\\s*\\([\\s\\S]*?\\bWITH\\b[\\s\\S]*?\\bAS\\s*\\("
+          flags: "i"
+        custom:
+          rule_id: "SQL-SMELL-026"
+          fix: "중첩된 WITH를 순차 CTE (WITH a AS (...), b AS (...))로 변환하세요"
+
+      - id: "sql-smell-027"
+        name: "AND/OR 괄호 누락"
+        severity: "high"
+        category: "correctness"
+        description: "WHERE절에서 AND와 OR를 혼합 사용할 때 괄호가 없으면 우선순위 실수가 발생합니다."
+        enabled: true
+        pattern:
+          type: "regex-multiline"
+          regex: "\\bWHERE\\b[\\s\\S]*?\\bAND\\b[\\s\\S]*?\\bOR\\b(?![\\s\\S]*?\\))"
+          flags: "i"
+        custom:
+          rule_id: "SQL-SMELL-027"
+          fix: "AND와 OR를 혼합할 때는 반드시 괄호로 우선순위를 명시하세요"
+
+      # ==================== 10-3. SQL 냄새 AST 규칙 ====================
+
+      - id: "sql-smell-030"
+        name: "LEFT JOIN 후 WHERE 우측 필터"
+        severity: "high"
+        category: "correctness"
+        description: "LEFT JOIN한 테이블을 WHERE에서 필터링하면 INNER JOIN과 동일합니다."
+        enabled: true
+        pattern:
+          type: "ast-sql-join"
+          conditions:
+            - "left-join-where-filter"
+        custom:
+          rule_id: "SQL-SMELL-030"
+          fix: "필터 조건을 ON절로 이동하거나 INNER JOIN으로 변경하세요"
+
+      - id: "sql-smell-031"
+        name: "LEFT JOIN 뒤 INNER JOIN"
+        severity: "high"
+        category: "correctness"
+        description: "LEFT JOIN 체인에서 INNER JOIN이 이전 LEFT JOIN을 무효화합니다."
+        enabled: true
+        pattern:
+          type: "ast-sql-join"
+          conditions:
+            - "inner-after-left"
+        custom:
+          rule_id: "SQL-SMELL-031"
+          fix: "LEFT JOIN 체인의 일관성을 검토하세요"
+
+      - id: "sql-smell-032"
+        name: "HAVING 비집계 조건"
+        severity: "high"
+        category: "performance"
+        description: "HAVING절에 비집계 조건은 WHERE로 이동해야 성능이 향상됩니다."
+        enabled: true
+        pattern:
+          type: "ast-sql-where"
+          conditions:
+            - "having-non-aggregate"
+        custom:
+          rule_id: "SQL-SMELL-032"
+          fix: "비집계 조건을 WHERE절로 이동하세요"
+
+      - id: "sql-smell-033"
+        name: "미사용 CTE"
+        severity: "high"
+        category: "maintainability"
+        description: "WITH절에 정의된 CTE가 본문에서 참조되지 않습니다."
+        enabled: true
+        pattern:
+          type: "ast-sql-table"
+          conditions:
+            - "unused-cte"
+        custom:
+          rule_id: "SQL-SMELL-033"
+          fix: "사용하지 않는 CTE를 제거하세요"
+
+      - id: "sql-smell-034"
+        name: "서브쿼리 내 ORDER BY"
+        severity: "high"
+        category: "performance"
+        description: "페이징 없는 서브쿼리의 ORDER BY는 무의미한 정렬 비용을 유발합니다."
+        enabled: true
+        pattern:
+          type: "ast-sql-orderby"
+          conditions:
+            - "orderby-in-subquery"
+        custom:
+          rule_id: "SQL-SMELL-034"
+          fix: "서브쿼리에서 불필요한 ORDER BY를 제거하세요"
+
+      - id: "sql-smell-035"
+        name: "인라인뷰 별칭 누락"
+        severity: "high"
+        category: "correctness"
+        description: "인라인뷰(서브쿼리 FROM절)에 별칭이 없으면 참조할 수 없습니다."
+        enabled: true
+        pattern:
+          type: "ast-sql-table"
+          conditions:
+            - "inline-view-alias-missing"
+        custom:
+          rule_id: "SQL-SMELL-035"
+          fix: "인라인뷰에 별칭을 추가하세요"
+
+      # ==================== 11. AST 기반 규칙 (sql-ast-*) ====================
+
+      - id: "sql-ast-from-001"
+        name: "AST 테이블 오너 누락"
+        severity: "high"
+        category: "from"
+        description: "AST 기반: 테이블명에 오너(스키마)가 누락되었습니다."
+        enabled: false  # 현장에서 DataSource 레벨 스키마 설정이 일반적
+        pattern:
+          type: "ast-sql-table"
+          conditions:
+            - "owner-missing"
+        custom:
+          rule_id: "SQL-AST-FROM-001"
+
+      - id: "sql-ast-from-003"
+        name: "AST 복수 테이블 별칭 누락"
+        severity: "high"
+        category: "from"
+        description: "AST 기반: 복수 테이블 사용 시 별칭이 누락되었습니다."
+        enabled: true
+        pattern:
+          type: "ast-sql-table"
+          conditions:
+            - "alias-missing"
+        custom:
+          rule_id: "SQL-AST-FROM-003"
+
+      - id: "sql-ast-sel-001"
+        name: "AST SELECT * 사용"
+        severity: "critical"
+        category: "select"
+        description: "AST 기반: SELECT * 대신 필요한 컬럼만 명시하세요."
+        enabled: true
+        pattern:
+          type: "ast-sql-select"
+          conditions:
+            - "select-star"
+        custom:
+          rule_id: "SQL-AST-SEL-001"
+
+      - id: "sql-ast-sel-002"
+        name: "AST 함수 별칭 누락"
+        severity: "low"
+        category: "select"
+        description: "AST 기반: 함수 사용 시 별칭을 지정하세요."
+        enabled: true
+        pattern:
+          type: "ast-sql-select"
+          conditions:
+            - "function-alias-missing"
+        custom:
+          rule_id: "SQL-AST-SEL-002"
+
+      - id: "sql-ast-where-003"
+        name: "AST 조인 조건 누락"
+        severity: "critical"
+        category: "where"
+        description: "AST 기반: 복수 테이블에 조인 조건이 누락되었습니다."
+        enabled: true
+        pattern:
+          type: "ast-sql-join"
+          conditions:
+            - "join-condition-missing"
+        custom:
+          rule_id: "SQL-AST-WHERE-003"
+
+      - id: "sql-ast-dml-004"
+        name: "AST UPDATE/DELETE WHERE 누락"
+        severity: "critical"
+        category: "dml"
+        description: "AST 기반: UPDATE/DELETE 문에 WHERE 절이 누락되었습니다."
+        enabled: true
+        pattern:
+          type: "ast-sql-where"
+          conditions:
+            - "dml-where-missing"
+        custom:
+          rule_id: "SQL-AST-DML-004"
+
+      - id: "sql-ast-order-001"
+        name: "AST ORDER BY 숫자"
+        severity: "high"
+        category: "orderby"
+        description: "AST 기반: ORDER BY에서 숫자 순서값 대신 컬럼명을 사용하세요."
+        enabled: true
+        pattern:
+          type: "ast-sql-orderby"
+          conditions:
+            - "orderby-numeric"
+        custom:
+          rule_id: "SQL-AST-ORDER-001"
+
+      - id: "sql-ast-order-002"
+        name: "AST GROUP BY시 ORDER BY 누락"
+        severity: "high"
+        category: "orderby"
+        description: "AST 기반: GROUP BY가 있지만 ORDER BY가 누락되었습니다."
+        enabled: true
+        pattern:
+          type: "ast-sql-orderby"
+          conditions:
+            - "groupby-without-orderby"
+        custom:
+          rule_id: "SQL-AST-ORDER-002"
+
+      - id: "sql-ast-sub-001"
+        name: "AST 서브쿼리 중첩 깊이 과다"
+        severity: "high"
+        category: "subquery"
+        description: "AST 기반: 서브쿼리 중첩 깊이가 과도합니다."
+        enabled: true
+        pattern:
+          type: "ast-sql-subquery"
+          conditions:
+            - "excessive-depth"
+        custom:
+          rule_id: "SQL-AST-SUB-001"
+          max_depth: 3
+
+      - id: "sql-ast-sub-004"
+        name: "AST 별칭 충돌"
+        severity: "high"
+        category: "subquery"
+        description: "AST 기반: 메인/서브쿼리 간 별칭이 중복됩니다."
+        enabled: true
+        pattern:
+          type: "ast-sql-subquery"
+          conditions:
+            - "alias-conflict"
+        custom:
+          rule_id: "SQL-AST-SUB-004"
+
+      - id: "sql-ast-set-001"
+        name: "AST 동일 테이블 UNION ALL"
+        severity: "high"
+        category: "set"
+        description: "AST 기반: 동일 테이블에 UNION ALL 사용은 조건절로 해결하세요."
+        enabled: true
+        pattern:
+          type: "ast-sql-setop"
+          conditions:
+            - "same-table-union-all"
+        custom:
+          rule_id: "SQL-AST-SET-001"
+
+      - id: "sql-ast-set-002"
+        name: "AST MINUS 대신 NOT EXISTS"
+        severity: "low"
+        category: "set"
+        description: "AST 기반: MINUS 대신 NOT EXISTS를 사용하세요."
+        enabled: false  # MINUS는 가독성이 좋고 실무에서 일반적으로 사용됨
+        pattern:
+          type: "ast-sql-setop"
+          conditions:
+            - "minus-usage"
+        custom:
+          rule_id: "SQL-AST-SET-002"
+
+      - id: "sql-ast-set-003"
+        name: "AST INTERSECT 대신 EXISTS"
+        severity: "low"
+        category: "set"
+        description: "AST 기반: INTERSECT 대신 EXISTS/JOIN을 사용하세요."
+        enabled: false  # INTERSECT는 가독성이 좋고 실무에서 일반적으로 사용됨
+        pattern:
+          type: "ast-sql-setop"
+          conditions:
+            - "intersect-usage"
+        custom:
+          rule_id: "SQL-AST-SET-003"
+
+      # ==================== SQL 성능 규칙 (Performance) ====================
+
+      - id: "sql-perf-001"
+        name: "WHERE 절 인덱스 컬럼에 TO_CHAR 함수 사용"
+        severity: "high"
+        category: "performance"
+        description: "WHERE/JOIN 조건에서 인덱스 컬럼을 TO_CHAR()로 감싸면 인덱스를 사용할 수 없어 풀스캔이 발생합니다."
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "\\b(WHERE|AND|OR|ON)\\s+[^<]*TO_CHAR\\s*\\(\\s*[A-Za-z_][A-Za-z0-9_.]*"
+          flags: "i"
+        custom:
+          rule_id: "SQL-PERF-001"
+          fix: "비교 대상을 변환하거나 함수 기반 인덱스를 생성하세요"
+
+      - id: "sql-perf-002"
+        name: "WHERE 절 인덱스 컬럼에 SUBSTR 함수 사용"
+        severity: "high"
+        category: "performance"
+        description: "WHERE 조건에서 인덱스 컬럼을 SUBSTR()로 감싸면 인덱스를 사용할 수 없습니다."
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "\\b(WHERE|AND|OR)\\s+[^<]*SUBSTR\\s*\\(\\s*[A-Za-z_][A-Za-z0-9_.]*"
+          flags: "i"
+        custom:
+          rule_id: "SQL-PERF-002"
+          fix: "LIKE 'prefix%' 또는 별도 컬럼으로 대체하세요"
+
+      - id: "sql-perf-003"
+        name: "NOT IN (서브쿼리) 사용"
+        severity: "medium"
+        category: "performance"
+        description: "NOT IN (서브쿼리)는 NULL 반환 시 전체 결과가 빈 집합이 되며 성능도 떨어집니다. NOT EXISTS를 사용하세요."
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "\\bNOT\\s+IN\\s*\\(\\s*SELECT\\b"
+          flags: "i"
+        custom:
+          rule_id: "SQL-PERF-003"
+          fix: "NOT EXISTS (SELECT 1 FROM ... WHERE ...) 로 변경하세요"
+
+      - id: "sql-perf-004"
+        name: "UNION 대신 UNION ALL 고려"
+        severity: "low"
+        category: "performance"
+        description: "UNION은 중복 제거를 위해 정렬합니다. 중복이 없거나 허용 가능하면 UNION ALL이 빠릅니다."
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "\\bUNION\\s+SELECT\\b"
+          flags: "i"
+        custom:
+          rule_id: "SQL-PERF-004"
+          fix: "중복이 불가능하거나 허용 가능하면 UNION ALL로 변경하세요"
+
+      - id: "sql-perf-005"
+        name: "SELECT * FROM (서브쿼리) 래핑"
+        severity: "low"
+        category: "performance"
+        description: "SELECT * FROM (서브쿼리)는 불필요한 데이터 전달 계층을 추가합니다. 필요한 컬럼만 명시하세요."
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "\\bSELECT\\s+\\*\\s+FROM\\s*\\("
+          flags: "i"
+        custom:
+          rule_id: "SQL-PERF-005"
+          fix: "필요한 컬럼만 명시적으로 선택하세요"
+
+      - id: "sql-perf-006"
+        name: "DB Link (@dblink) 분산 쿼리 사용"
+        severity: "medium"
+        category: "performance"
+        description: "DB Link를 통한 분산 쿼리는 네트워크 지연과 장애에 취약합니다."
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "\\b[A-Za-z_][A-Za-z0-9_]*@[A-Za-z_][A-Za-z0-9_]*\\b"
+          flags: "i"
+        custom:
+          rule_id: "SQL-PERF-006"
+          fix: "데이터 복제, API, 또는 ETL로 대체를 검토하세요"
+
+      - id: "sql-perf-007"
+        name: "WHERE 절 인덱스 컬럼에 NVL 함수 사용"
+        severity: "medium"
+        category: "performance"
+        description: "WHERE 조건에서 인덱스 컬럼을 NVL()로 감싸면 인덱스를 사용할 수 없습니다."
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "\\b(WHERE|AND|OR)\\s+[^<]*NVL\\s*\\(\\s*[A-Za-z_][A-Za-z0-9_.]*"
+          flags: "i"
+        custom:
+          rule_id: "SQL-PERF-007"
+          fix: "(col = value OR col IS NULL) 또는 COALESCE 인덱스를 사용하세요"
+
+      - id: "sql-perf-008"
+        name: "SELECT 절 다중 스칼라 서브쿼리 (동일 테이블)"
+        severity: "high"
+        category: "performance"
+        description: "SELECT 절에 동일 테이블을 참조하는 스칼라 서브쿼리가 여러 개 있으면 행마다 N회 쿼리가 실행됩니다. JOIN으로 변경하세요."
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "\\bSELECT\\b[^;]*(\\(\\s*SELECT\\b[^)]*\\))[^;]*(\\(\\s*SELECT\\b[^)]*\\))"
+          flags: "is"
+        custom:
+          rule_id: "SQL-PERF-008"
+          fix: "스칼라 서브쿼리를 LEFT JOIN으로 통합하세요"
+
+      - id: "sql-perf-009"
+        name: "WHERE 절 상관 서브쿼리에 MAX/MIN 사용"
+        severity: "medium"
+        category: "performance"
+        description: "WHERE 절에서 상관 서브쿼리로 MAX/MIN을 구하면 외부 행마다 반복 실행됩니다."
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "\\b(WHERE|AND)\\s+[^<]*=\\s*\\(\\s*SELECT\\s+MAX\\b"
+          flags: "i"
+        custom:
+          rule_id: "SQL-PERF-009"
+          fix: "인라인 뷰 또는 윈도우 함수(ROW_NUMBER, RANK)로 대체하세요"
+
+      - id: "sql-perf-010"
+        name: "ROWNUM 페이징에서 ORDER BY 위치 오류"
+        severity: "medium"
+        category: "performance"
+        description: "ROWNUM은 ORDER BY보다 먼저 할당되므로, ORDER BY가 포함된 서브쿼리를 감싸서 ROWNUM을 적용해야 합니다."
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "\\bROWNUM\\b[^)]*\\bORDER\\s+BY\\b"
+          flags: "i"
+        custom:
+          rule_id: "SQL-PERF-010"
+          fix: "ORDER BY를 안쪽 서브쿼리에 넣고, ROWNUM은 바깥에서 적용하세요"
+
+      # ==================== SQL 스멜 추가 규칙 ====================
+
+      - id: "sql-smell-040"
+        name: "SELECT 절 스칼라 서브쿼리"
+        severity: "medium"
+        category: "smell"
+        description: "SELECT 절의 스칼라 서브쿼리는 행마다 실행되어 N+1 쿼리 문제를 유발합니다."
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "\\bSELECT\\b[^(]*\\(\\s*SELECT\\b"
+          flags: "i"
+        custom:
+          rule_id: "SQL-SMELL-040"
+          fix: "LEFT JOIN으로 변경하세요"
+
+      - id: "sql-smell-041"
+        name: "3단계 이상 중첩 서브쿼리"
+        severity: "medium"
+        category: "smell"
+        description: "서브쿼리가 3단계 이상 중첩되면 가독성과 옵티마이저 성능이 저하됩니다."
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "\\(\\s*SELECT\\b[^)]*\\(\\s*SELECT\\b[^)]*\\(\\s*SELECT\\b"
+          flags: "is"
+        custom:
+          rule_id: "SQL-SMELL-041"
+          fix: "CTE(WITH 절) 또는 인라인 뷰로 분리하세요"
+
+      - id: "sql-smell-042"
+        name: "과다 DECODE 분기 (5개 이상)"
+        severity: "low"
+        category: "smell"
+        description: "DECODE 함수의 분기가 5개 이상이면 CASE WHEN으로 변경하는 것이 가독성이 좋습니다."
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "\\bDECODE\\s*\\([^,]+,[^,]+,[^,]+,[^,]+,[^,]+,[^,]+,[^,]+,[^,]+,[^,]+,[^,]+"
+          flags: "i"
+        custom:
+          rule_id: "SQL-SMELL-042"
+          fix: "CASE WHEN으로 변경하세요"
+
+  - language: xml
+    rules:
+      # ==================== MyBatis XML 관련 규칙 ====================
+
+      - id: "sql-mybatis-001"
+        name: "MyBatis ${} SQL Injection 취약"
+        severity: "critical"
+        category: "security"
+        description: "조건절에서 ${}는 SQL Injection에 취약합니다. #{}를 사용하세요."
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "=\\s*['\"]?\\$\\{[^}]+\\}['\"]?"
+        custom:
+          rule_id: "SQL-MYBATIS-001"
+          fix: "${} 대신 #{}를 사용하세요"
+
+      - id: "sql-mybatis-002"
+        name: "MyBatis SELECT *"
+        severity: "critical"
+        category: "select"
+        description: "MyBatis에서 SELECT *는 사용 금지입니다."
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "<select[^>]*>\\s*SELECT\\s+\\*"
+          flags: "i"
+        custom:
+          rule_id: "SQL-MYBATIS-002"
+
+      - id: "sql-mybatis-003"
+        name: "MyBatis 한줄 주석"
+        severity: "high"
+        category: "comment"
+        description: "MyBatis SQL에서 -- 주석은 사용 금지입니다. XML 주석(<!-- -->)은 제외합니다."
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "(?:^|[^!])--(?![>+])"
+        custom:
+          rule_id: "SQL-MYBATIS-003"
+
+      - id: "sql-mybatis-005"
+        name: "MyBatis ORDER BY 숫자"
+        severity: "high"
+        category: "orderby"
+        description: "MyBatis SQL에서 ORDER BY 숫자는 사용 금지입니다."
+        enabled: false  # sql-order-001과 동일 regex 중복
+        pattern:
+          type: "regex"
+          regex: "\\bORDER\\s+BY\\s+\\d+"
+          flags: "i"
+        custom:
+          rule_id: "SQL-MYBATIS-005"
+
+      - id: "sql-mybatis-006"
+        name: "MyBatis 테이블 오너 누락"
+        severity: "high"
+        category: "from"
+        description: "MyBatis SQL에서 테이블 오너가 누락되었습니다. (일반적으로 DataSource 레벨에서 스키마를 설정하므로 대부분 불필요)"
+        enabled: false
+        pattern:
+          type: "regex"
+          regex: "\\bFROM\\s+(?![A-Z_]+\\.)[A-Z_]+\\s"
+          flags: "i"
+        custom:
+          rule_id: "SQL-MYBATIS-006"
+
+      - id: "sql-mybatis-008"
+        name: "MyBatis 선행 와일드카드"
+        severity: "high"
+        category: "where"
+        description: "MyBatis SQL에서 LIKE '%...' 패턴은 성능 저하를 유발합니다."
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "\\bLIKE\\s+['\"]%|\\bLIKE\\s+CONCAT\\s*\\(\\s*['\"]%"
+          flags: "i"
+        custom:
+          rule_id: "SQL-MYBATIS-008"
+
+      - id: "sql-mybatis-009"
+        name: "MyBatis UPDATE WHERE 누락"
+        severity: "critical"
+        category: "dml"
+        description: "MyBatis UPDATE 문에 WHERE 절이 누락되었습니다."
+        enabled: false
+        pattern:
+          type: "method-analysis"
+          conditions:
+            - "mybatis-update-without-where"
+        custom:
+          rule_id: "SQL-MYBATIS-009"
+
+      - id: "sql-mybatis-010"
+        name: "MyBatis DELETE WHERE 누락"
+        severity: "critical"
+        category: "dml"
+        description: "MyBatis DELETE 문에 WHERE 절이 누락되었습니다."
+        enabled: false
+        pattern:
+          type: "method-analysis"
+          conditions:
+            - "mybatis-delete-without-where"
+        custom:
+          rule_id: "SQL-MYBATIS-010"
+
+      - id: "quality-mybatis-if-001"
+        name: "MyBatis 과도한 동적 SQL 조건"
+        severity: "high"
+        category: "complexity"
+        description: "SQL 문에 <if> 조건이 과도하게 많습니다. SQL을 분리하거나 단순화하세요."
+        enabled: true
+        pattern:
+          type: "method-analysis"
+          conditions:
+            - "mybatis-excessive-if"
+        custom:
+          max_if_conditions: 15
+          rule_id: "MYBATIS-IF-001"
+          fix: "SQL을 여러 개로 분리하거나, 공통 조건을 묶어 단순화하세요"
+
+      # ==================== MyBatis 추가 규칙 ====================
+
+      - id: "sql-mybatis-011"
+        name: "MyBatis resultType에 HashMap/Map 사용"
+        severity: "medium"
+        category: "mybatis"
+        description: "resultType에 hashMap/map을 사용하면 타입 안전성이 사라지고, 컬럼명 변경 시 컴파일 오류를 감지할 수 없습니다."
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "resultType\\s*=\\s*\"(hashMap|hashmap|HashMap|map|java\\.util\\.(Hash)?Map)\""
+        custom:
+          rule_id: "SQL-MYBATIS-011"
+          fix: "전용 VO/DTO 클래스를 만들어 resultType으로 사용하세요"
+
+      - id: "sql-mybatis-012"
+        name: "MyBatis parameterType에 HashMap/Map 사용"
+        severity: "medium"
+        category: "mybatis"
+        description: "parameterType에 hashMap/map을 사용하면 파라미터 키 오타를 컴파일 시 감지할 수 없습니다."
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "parameterType\\s*=\\s*\"(hashMap|hashmap|HashMap|map|java\\.util\\.(Hash)?Map)\""
+        custom:
+          rule_id: "SQL-MYBATIS-012"
+          fix: "전용 VO/DTO 클래스를 parameterType으로 사용하세요"
+
+      - id: "sql-mybatis-013"
+        name: "MyBatis SQL 블록 재사용 누락"
+        severity: "medium"
+        category: "mybatis"
+        description: "동일 mapper 내 SQL 문이 매우 유사합니다. <sql>/<include>를 사용하여 공통 SQL을 재사용하세요."
+        enabled: false  # method-analysis 핸들러 미구현, 향후 구현 예정
+        pattern:
+          type: "method-analysis"
+          conditions:
+            - "mybatis-duplicate-sql-body"
+        custom:
+          rule_id: "SQL-MYBATIS-013"
+          min_duplicate_count: 3
+          fix: "<sql id='...'>로 공통 SQL을 추출하고 <include refid='...'>로 재사용하세요"
+
+      - id: "sql-mybatis-014"
+        name: "MyBatis WHERE 1=1 사용 (<where> 태그 권장)"
+        severity: "low"
+        category: "mybatis"
+        description: "WHERE 1=1과 <if>를 사용하는 대신 MyBatis <where> 태그를 사용하면 AND/OR이 자동 조정됩니다."
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "WHERE\\s+1\\s*=\\s*1"
+          flags: "i"
+        custom:
+          rule_id: "SQL-MYBATIS-014"
+          fix: "WHERE 1=1을 제거하고 MyBatis <where> 태그로 감싸세요"
+
+      - id: "sql-mybatis-015"
+        name: "MyBatis <insert> 태그에 UPDATE 문 사용"
+        severity: "medium"
+        category: "mybatis"
+        description: "<insert> 태그 안에 UPDATE 문이 있습니다. DML 유형에 맞는 태그(<update>)를 사용하세요."
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "<insert\\s[^>]*>[\\s\\S]*?\\bUPDATE\\s+\\w"
+          flags: "i"
+        custom:
+          rule_id: "SQL-MYBATIS-015"
+          fix: "<update> 태그를 사용하세요"
+
+      - id: "sql-mybatis-016"
+        name: "MyBatis <update> 태그에 DELETE 문 사용"
+        severity: "medium"
+        category: "mybatis"
+        description: "<update> 태그 안에 DELETE 문이 있습니다. DML 유형에 맞는 태그(<delete>)를 사용하세요."
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "<update\\s[^>]*>[\\s\\S]*?\\bDELETE\\s+FROM\\b"
+          flags: "i"
+        custom:
+          rule_id: "SQL-MYBATIS-016"
+          fix: "<delete> 태그를 사용하세요"
+
+      - id: "sql-mybatis-017"
+        name: "MyBatis <selectKey> order 속성 누락"
+        severity: "low"
+        category: "mybatis"
+        description: "<selectKey>에 order 속성이 없으면 실행 순서가 불명확합니다."
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "<selectKey\\s+(?!.*order\\s*=)[^>]*>"
+        custom:
+          rule_id: "SQL-MYBATIS-017"
+          fix: "order=\"BEFORE\" 또는 order=\"AFTER\"를 명시하세요"
+
+      - id: "sql-mybatis-018"
+        name: "MyBatis 페이지네이션에서 별칭.* 사용"
+        severity: "low"
+        category: "mybatis"
+        description: "페이지네이션 래퍼에서 별칭.*를 사용하면 불필요한 컬럼이 포함됩니다. 필요한 컬럼만 명시하세요."
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "SELECT\\s+[A-Za-z]\\w*\\.\\*\\s+FROM\\s*\\("
+          flags: "i"
+        custom:
+          rule_id: "SQL-MYBATIS-018"
+          fix: "SELECT A.col1, A.col2, ... 로 필요한 컬럼만 명시하세요"
+
+      # ==================== SQL 성능 규칙 (XML 내 MyBatis SQL용) ====================
+
+      - id: "sql-xml-perf-001"
+        name: "WHERE 절 인덱스 컬럼에 TO_CHAR 사용 (MyBatis)"
+        severity: "high"
+        category: "performance"
+        description: "WHERE/JOIN 조건에서 인덱스 컬럼을 TO_CHAR()로 감싸면 인덱스를 사용할 수 없어 풀스캔이 발생합니다."
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "\\b(WHERE|AND|OR|ON)\\s+[^<]*TO_CHAR\\s*\\(\\s*[A-Za-z_][A-Za-z0-9_.]*"
+          flags: "i"
+        custom:
+          rule_id: "SQL-XML-PERF-001"
+          fix: "비교 대상을 변환하거나 함수 기반 인덱스를 생성하세요"
+
+      - id: "sql-xml-perf-002"
+        name: "WHERE 절 인덱스 컬럼에 SUBSTR 사용 (MyBatis)"
+        severity: "high"
+        category: "performance"
+        description: "WHERE 조건에서 인덱스 컬럼을 SUBSTR()로 감싸면 인덱스를 사용할 수 없습니다."
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "\\b(WHERE|AND|OR)\\s+[^<]*SUBSTR\\s*\\(\\s*[A-Za-z_][A-Za-z0-9_.]*"
+          flags: "i"
+        custom:
+          rule_id: "SQL-XML-PERF-002"
+          fix: "LIKE 'prefix%' 또는 별도 컬럼으로 대체하세요"
+
+      - id: "sql-xml-perf-003"
+        name: "NOT IN (서브쿼리) 사용 (MyBatis)"
+        severity: "medium"
+        category: "performance"
+        description: "NOT IN (서브쿼리)는 NULL 반환 시 전체 결과가 빈 집합이 되며 성능도 떨어집니다."
+        enabled: true
+        pattern:
+          type: "regex-multiline"
+          regex: "\\bNOT\\s+IN\\s*\\(\\s*SELECT\\b"
+        custom:
+          rule_id: "SQL-XML-PERF-003"
+          flags: "i"
+          fix: "NOT EXISTS (SELECT 1 FROM ... WHERE ...) 로 변경하세요"
+
+      - id: "sql-xml-perf-004"
+        name: "UNION 대신 UNION ALL 고려 (MyBatis)"
+        severity: "low"
+        category: "performance"
+        description: "UNION은 중복 제거를 위해 정렬합니다. 중복이 없으면 UNION ALL이 빠릅니다."
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "\\bUNION\\s+SELECT\\b"
+          flags: "i"
+        custom:
+          rule_id: "SQL-XML-PERF-004"
+          fix: "중복이 불가능하면 UNION ALL로 변경하세요"
+
+      - id: "sql-xml-perf-005"
+        name: "SELECT * FROM (서브쿼리) 래핑 (MyBatis)"
+        severity: "low"
+        category: "performance"
+        description: "SELECT * FROM (서브쿼리)는 불필요한 데이터 전달 계층을 추가합니다."
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "\\bSELECT\\s+\\*\\s+FROM\\s*\\("
+          flags: "i"
+        custom:
+          rule_id: "SQL-XML-PERF-005"
+          fix: "필요한 컬럼만 명시적으로 선택하세요"
+
+      - id: "sql-xml-perf-006"
+        name: "DB Link 분산 쿼리 사용 (MyBatis)"
+        severity: "medium"
+        category: "performance"
+        description: "DB Link를 통한 분산 쿼리는 네트워크 지연과 장애에 취약합니다."
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "\\b[A-Za-z_][A-Za-z0-9_]*@[A-Za-z_][A-Za-z0-9_]*\\b"
+        custom:
+          rule_id: "SQL-XML-PERF-006"
+          fix: "데이터 복제, API, 또는 ETL로 대체를 검토하세요"
+
+      - id: "sql-xml-perf-007"
+        name: "WHERE 절 인덱스 컬럼에 NVL 사용 (MyBatis)"
+        severity: "medium"
+        category: "performance"
+        description: "WHERE 조건에서 인덱스 컬럼을 NVL()로 감싸면 인덱스를 사용할 수 없습니다."
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "\\b(WHERE|AND|OR)\\s+[^<]*NVL\\s*\\(\\s*[A-Za-z_][A-Za-z0-9_.]*"
+          flags: "i"
+        custom:
+          rule_id: "SQL-XML-PERF-007"
+          fix: "(col = value OR col IS NULL) 또는 COALESCE 인덱스를 사용하세요"
+
+      - id: "sql-xml-perf-008"
+        name: "SELECT 절 다중 스칼라 서브쿼리 (MyBatis)"
+        severity: "high"
+        category: "performance"
+        description: "SELECT 절에 스칼라 서브쿼리가 여러 개 있으면 행마다 N회 쿼리가 실행됩니다."
+        enabled: true
+        pattern:
+          type: "regex-multiline"
+          regex: "\\bSELECT\\b[^;]*(\\(\\s*SELECT\\b[^)]*\\))[^;]*(\\(\\s*SELECT\\b[^)]*\\))"
+        custom:
+          rule_id: "SQL-XML-PERF-008"
+          flags: "i"
+          fix: "스칼라 서브쿼리를 LEFT JOIN으로 통합하세요"
+
+      - id: "sql-xml-perf-009"
+        name: "WHERE 절 상관 서브쿼리에 MAX/MIN 사용 (MyBatis)"
+        severity: "medium"
+        category: "performance"
+        description: "WHERE 절에서 상관 서브쿼리로 MAX/MIN을 구하면 외부 행마다 반복 실행됩니다."
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "=\\s*\\(\\s*SELECT\\s+(MAX|MIN)\\s*\\("
+          flags: "i"
+        custom:
+          rule_id: "SQL-XML-PERF-009"
+          fix: "인라인 뷰 또는 윈도우 함수(ROW_NUMBER, RANK)로 대체하세요"
+
+      - id: "sql-xml-smell-040"
+        name: "SELECT 절 스칼라 서브쿼리 (MyBatis)"
+        severity: "medium"
+        category: "smell"
+        description: "SELECT 절의 스칼라 서브쿼리는 행마다 실행되어 N+1 쿼리 문제를 유발합니다."
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "\\bSELECT\\b[^(]*\\(\\s*SELECT\\b"
+          flags: "i"
+        custom:
+          rule_id: "SQL-XML-SMELL-040"
+          fix: "LEFT JOIN으로 변경하세요"
+
+      - id: "sql-xml-oracle-020"
+        name: "Oracle (+) 외부조인 구문 사용 (MyBatis)"
+        severity: "low"
+        category: "portability"
+        description: "Oracle 전용 (+) 외부조인 구문은 ANSI LEFT/RIGHT JOIN으로 대체하세요."
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "\\w+\\s*\\(\\+\\)"
+        custom:
+          rule_id: "SQL-XML-ORACLE-020"
+          fix: "LEFT JOIN 또는 RIGHT JOIN ANSI 구문으로 변경하세요"

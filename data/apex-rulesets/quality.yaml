@@ -1,0 +1,1677 @@
+# Code Quality Ruleset
+version: "1.0"
+profile: "quality"
+
+languages:
+  - language: java
+    rules:
+      # ==================== 1. 클래스 명명규칙 ====================
+      - id: "quality-nc-001"
+        name: "Controller 클래스명 규칙 위반"
+        severity: "high"
+        category: "naming"
+        description: "Controller 클래스는 [표준단어조합]Controller 형식이어야 합니다"
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "class\\s+(?![A-Z][a-zA-Z0-9]*Controller\\b)\\w+Controller\\s+(extends|implements|\\{)"
+        custom:
+          rule_id: "NC-001"
+          expected_pattern: "[표준단어조합]Controller"
+          example: "UserManageController"
+
+      - id: "quality-nc-002"
+        name: "Service 인터페이스명 규칙 위반"
+        severity: "high"
+        category: "naming"
+        description: "Service 인터페이스는 [표준단어조합]Service 형식이어야 합니다"
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "interface\\s+(?![A-Z][a-zA-Z0-9]*Service\\b)\\w+Service\\s*(extends|\\{)"
+        custom:
+          rule_id: "NC-002"
+          expected_pattern: "[표준단어조합]Service"
+          example: "UserManageService"
+
+      - id: "quality-nc-004"
+        name: "Mapper 인터페이스명 규칙 위반"
+        severity: "high"
+        category: "naming"
+        description: "Mapper 인터페이스는 [표준단어조합]Mapper 형식이어야 합니다"
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "interface\\s+(?![A-Z][a-zA-Z0-9]*Mapper\\b)\\w+Mapper\\s*(extends|\\{)"
+        custom:
+          rule_id: "NC-004"
+          expected_pattern: "[표준단어조합]Mapper"
+          example: "UserManageMapper"
+
+      - id: "quality-nc-005"
+        name: "VO 클래스명 규칙 위반"
+        severity: "high"
+        category: "naming"
+        description: "VO 클래스는 [표준단어조합]Vo 형식이어야 합니다"
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "class\\s+(?![A-Z][a-zA-Z0-9]*Vo\\b)\\w+Vo\\s+(extends|implements|\\{)"
+        custom:
+          rule_id: "NC-005"
+          expected_pattern: "[표준단어조합]Vo"
+          example: "UserManageVo"
+
+      - id: "quality-nc-006"
+        name: "상수 클래스명 규칙 위반"
+        severity: "medium"
+        category: "naming"
+        description: "상수 클래스는 [표준단어조합]Const 형식이어야 합니다"
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "class\\s+(?![A-Z][a-zA-Z0-9]*Const\\b)\\w+Const\\s+(extends|implements|\\{)"
+        custom:
+          rule_id: "NC-006"
+          expected_pattern: "[표준단어조합]Const"
+          example: "UserConst"
+
+      - id: "quality-nc-007"
+        name: "유틸 클래스명 규칙 위반"
+        severity: "medium"
+        category: "naming"
+        description: "유틸 클래스는 [표준단어조합]Util 형식이어야 합니다"
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "class\\s+(?![A-Z][a-zA-Z0-9]*Util\\b)\\w+Util\\s+(extends|implements|\\{)"
+        custom:
+          rule_id: "NC-007"
+          expected_pattern: "[표준단어조합]Util"
+          example: "StringUtil"
+
+      - id: "quality-nc-008"
+        name: "클래스명 파스칼표기법 위반"
+        severity: "high"
+        category: "naming"
+        description: "클래스명은 대문자로 시작하는 파스칼 표기법을 사용해야 합니다"
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "class\\s+[a-z][a-zA-Z0-9]*\\s+"
+        custom:
+          rule_id: "NC-008"
+          expected_pattern: "PascalCase (대문자로 시작)"
+
+      # ==================== 2. 메서드 명명규칙 ====================
+      - id: "quality-nc-101"
+        name: "메서드 카멜표기법 위반"
+        severity: "high"
+        category: "naming"
+        description: "메서드명은 소문자로 시작하는 카멜 표기법을 사용해야 합니다"
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "(public|protected|private)\\s+[\\w<>,\\s]+\\s+[A-Z][a-zA-Z0-9]*\\s*\\("
+        custom:
+          rule_id: "NC-101"
+          expected_pattern: "camelCase (소문자로 시작)"
+
+      - id: "quality-nc-102"
+        name: "메서드 비표준동사 사용"
+        severity: "medium"
+        category: "naming"
+        description: "메서드명은 표준동사(inquire, retrieve, select, find, get, register, create, make, save, update, change, set, adjust, delete, execute, handle, apply, calculate, validate, check, certify, approve, reject, cancel, send, receive, transmit, encrypt, decrypt, upload, download 등)로 시작해야 합니다"
+        enabled: true
+        pattern:
+          type: "method-analysis"
+          conditions:
+            - "non-standard-verb-method"
+        custom:
+          rule_id: "NC-102"
+          standard_verbs: "inquire,retrieve,select,find,get,is,has,register,create,make,save,update,change,set,adjust,delete,execute,handle,apply,calculate,validate,check,certify,approve,reject,cancel,send,receive,transmit,encrypt,decrypt,upload,download,acquire,issue,manage,monitor,print,reserve,delay,extract,wait,delivery,inhouse,process,init,setup,configure,convert,parse,format,build,generate,load,read,write,open,close,start,stop,run,call,add,put,insert,remove,log,notify,publish,verify"
+
+      # ==================== 3. 변수 명명규칙 ====================
+      - id: "quality-nc-201"
+        name: "변수 카멜표기법 위반"
+        severity: "high"
+        category: "naming"
+        description: "변수명은 소문자로 시작하는 카멜 표기법을 사용해야 합니다"
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "(private|protected|public)\\s+(?!static\\s+final)[\\w<>,\\s]+\\s+[A-Z][a-zA-Z0-9]*\\s*(=|;)"
+        custom:
+          rule_id: "NC-201"
+          expected_pattern: "camelCase (소문자로 시작)"
+
+      - id: "quality-nc-202"
+        name: "단일문자 변수 사용"
+        severity: "high"
+        category: "naming"
+        description: "반복문/예외처리 외 단일문자 변수 사용은 금지됩니다"
+        enabled: false
+        pattern:
+          type: "regex"
+          regex: "(String|int|long|double|float|boolean|Object|Integer|Long|Double|Float|Boolean)\\s+[a-hlo-zA-Z]\\s*(=|;)"
+        custom:
+          rule_id: "NC-202"
+          allowed_single_chars: "i,j,k,m,n,c,d,e"
+
+      - id: "quality-nc-203"
+        name: "모호한 변수명 사용"
+        severity: "medium"
+        category: "naming"
+        description: "temp, tmp, data, obj, str, num, val, var 등 모호한 변수명 사용은 금지됩니다"
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "(\\w+(<[^>]+>)?(\\[\\])?)\\s+(temp|tmp|data|obj|str|num|val)\\s*(=|;|,)"
+        custom:
+          rule_id: "NC-203"
+          forbidden_variables: "temp,tmp,data,obj,str,num,val,var"
+
+      - id: "quality-nc-204"
+        name: "변수명 언더스코어/달러 시작"
+        severity: "medium"
+        category: "naming"
+        description: "변수명은 언더스코어(_) 또는 달러($)로 시작할 수 없습니다"
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "(private|protected|public)\\s+[\\w<>,\\s]+\\s+[_$][a-zA-Z0-9]*\\s*(=|;)"
+        custom:
+          rule_id: "NC-204"
+
+      # ==================== 4. 상수 명명규칙 ====================
+      - id: "quality-nc-301"
+        name: "상수 대문자 표기 위반"
+        severity: "high"
+        category: "naming"
+        description: "상수명은 모두 대문자를 사용해야 합니다 (serialVersionUID, log/logger 제외)"
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "static\\s+final\\s+[\\w<>]+\\s+[a-z][a-zA-Z0-9_]*\\s*(=|;)"
+        exclude:
+          - "serialVersionUID"
+          - "static\\s+final\\s+Logger\\s+"
+          - "static\\s+final\\s+Log\\s+"
+        custom:
+          rule_id: "NC-301"
+          expected_pattern: "UPPER_CASE"
+
+      - id: "quality-nc-302"
+        name: "상수 언더스코어 구분 위반"
+        severity: "high"
+        category: "naming"
+        description: "상수의 단어 간에는 언더스코어(_)로 구분해야 합니다"
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "static\\s+final\\s+[\\w<>]+\\s+[A-Z][A-Z0-9]*[a-z][A-Za-z0-9]*\\s*(=|;)"
+        custom:
+          rule_id: "NC-302"
+          expected_pattern: "UPPER_SNAKE_CASE"
+
+      - id: "quality-nc-303"
+        name: "상수 static final 누락"
+        severity: "high"
+        category: "naming"
+        description: "상수는 static final로 선언해야 합니다"
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "(public|private|protected)\\s+static\\s+(?!final)[\\w<>]+\\s+[A-Z][A-Z0-9_]*\\s*(=|;)"
+        custom:
+          rule_id: "NC-303"
+
+      # ==================== 5. 패키지 명명규칙 ====================
+      - id: "quality-nc-401"
+        name: "패키지명 대문자 사용"
+        severity: "high"
+        category: "naming"
+        description: "패키지명은 모두 소문자를 사용해야 합니다"
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "package\\s+[a-z0-9.]*[A-Z][a-zA-Z0-9.]*;"
+        custom:
+          rule_id: "NC-401"
+          expected_pattern: "소문자만 사용"
+
+      # ==================== 6. URL 명명규칙 ====================
+      - id: "quality-nc-502"
+        name: "예약 URL 사용"
+        severity: "critical"
+        category: "naming"
+        description: "/html, /css, /image, /js, /jsp, /static, /resources URL은 사용할 수 없습니다"
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "@(RequestMapping|GetMapping|PostMapping|PutMapping|DeleteMapping)\\s*\\([^)]*\"/(html|css|image|js|jsp|static|resources)"
+        custom:
+          rule_id: "NC-502"
+          reserved_urls: "/html,/css,/image,/js,/jsp,/static,/resources"
+
+      # ==================== 7. 코딩 스타일 ====================
+      - id: "quality-cs-001"
+        name: "탭 문자 사용"
+        severity: "low"
+        category: "style"
+        description: "들여쓰기에 탭(tab) 대신 스페이스(space)를 사용해야 합니다. IDE 포맷터로 일괄 변환 가능."
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "^\t"
+        custom:
+          rule_id: "CS-001"
+
+      - id: "quality-cs-003"
+        name: "한 줄에 여러 문장"
+        severity: "high"
+        category: "style"
+        description: "한 줄에 하나의 statement만 기술해야 합니다"
+        enabled: false
+        pattern:
+          type: "regex"
+          regex: ";\\s*[a-zA-Z].*;"
+        custom:
+          rule_id: "CS-003"
+
+      - id: "quality-cs-007"
+        name: "이항연산자 공백 누락"
+        severity: "medium"
+        category: "style"
+        description: "이항연산자(=, +, -, *, /, %, ==, != 등) 양쪽에는 공백이 필요합니다"
+        enabled: false
+        pattern:
+          type: "regex"
+          regex: "[a-zA-Z0-9][=+\\-*/][a-zA-Z0-9]"
+        custom:
+          rule_id: "CS-007"
+
+      # ==================== 8. 로깅 규칙 ====================
+      - id: "quality-lg-001"
+        name: "System.out 사용"
+        severity: "critical"
+        category: "logging"
+        description: "System.out.println() 사용은 금지됩니다. Logback 프레임워크를 사용하세요."
+        enabled: true
+        pattern:
+          type: "ast-method-call"
+          method: "^(print|println|printf)$"
+          qualifier: "^System\\.(out|err)$"
+        custom:
+          rule_id: "LG-001"
+          fix: "Logback 프레임워크(logger.info/debug/error)를 사용하세요"
+
+      - id: "quality-lg-005"
+        name: "Logger 문자열 연결 사용"
+        severity: "high"
+        category: "logging"
+        description: "Logger에서 '+' 연산자로 문자열 연결은 금지됩니다. {} 플레이스홀더를 사용하세요."
+        enabled: true
+        pattern:
+          type: "ast-filtered-regex"
+          regex: "logger\\.(debug|info|warn|error)\\s*\\([^)]*\\+[^)]*\\)"
+        custom:
+          rule_id: "LG-005"
+          fix: "{} 플레이스홀더를 사용하세요: logger.info(\"message: {}\", value)"
+
+      - id: "quality-lg-006"
+        name: "Logger 플레이스홀더 미사용"
+        severity: "high"
+        category: "logging"
+        description: "변수 출력 시 {} 플레이스홀더를 사용해야 합니다"
+        enabled: true
+        pattern:
+          type: "ast-filtered-regex"
+          regex: "logger\\.(debug|info|warn|error)\\s*\\([^{]*\\+\\s*[a-zA-Z]"
+        custom:
+          rule_id: "LG-006"
+          fix: "{} 플레이스홀더를 사용하세요: logger.info(\"value: {}\", value)"
+
+      - id: "quality-lg-007"
+        name: "catch 외부에서 error 레벨 사용"
+        severity: "high"
+        category: "logging"
+        description: "logger.error()는 catch 블록 내부에서만 사용해야 합니다"
+        enabled: false
+        pattern:
+          type: "method-analysis"
+          conditions:
+            - "error-log-outside-catch"
+        custom:
+          rule_id: "LG-007"
+
+      # ==================== 9. 예외 처리 규칙 ====================
+      - id: "quality-ex-001"
+        name: "일반 Exception throw"
+        severity: "critical"
+        category: "exception"
+        description: "예외 발생 시 BusinessException만 사용해야 합니다"
+        enabled: false
+        pattern:
+          type: "regex"
+          regex: "throw\\s+new\\s+(?!BusinessException)[A-Z][a-zA-Z]*Exception\\s*\\("
+        custom:
+          rule_id: "EX-001"
+
+      - id: "quality-ex-002"
+        name: "Root Cause 미전달"
+        severity: "critical"
+        category: "exception"
+        description: "try-catch에서 예외 재정의 시 root cause 객체를 전달해야 합니다"
+        enabled: true
+        pattern:
+          type: "method-analysis"
+          conditions:
+            - "missing-root-cause"
+        custom:
+          rule_id: "EX-002"
+
+      - id: "quality-ex-004"
+        name: "빈 catch 블록"
+        severity: "critical"
+        category: "exception"
+        description: "catch 블록에서 예외를 무시하면 안 됩니다"
+        enabled: true
+        pattern:
+          type: "ast-try-catch"
+        custom:
+          rule_id: "EX-004"
+          catch_is_empty: true
+          fix: "catch 블록에 logger.error(\"message\", e)를 추가하세요"
+
+      # ==================== 10. 주석 규칙 ====================
+      - id: "quality-cmt-001"
+        name: "클래스 Javadoc 누락"
+        severity: "medium"
+        category: "documentation"
+        description: "모든 클래스에는 Javadoc 주석이 필요합니다"
+        enabled: true
+        pattern:
+          type: "method-analysis"
+          conditions:
+            - "class-without-javadoc"
+        custom:
+          rule_id: "CMT-001"
+
+      - id: "quality-cmt-002"
+        name: "public 메서드 Javadoc 누락"
+        severity: "medium"
+        category: "documentation"
+        description: "public 메서드에는 Javadoc 주석이 필요합니다"
+        enabled: true
+        pattern:
+          type: "method-analysis"
+          conditions:
+            - "public-method-without-javadoc"
+        custom:
+          rule_id: "CMT-002"
+
+      # ==================== 11. 코드 품질 규칙 ====================
+      - id: "quality-cq-001"
+        name: "코드 중복"
+        severity: "high"
+        category: "maintainability"
+        description: "불가피한 경우 외 코드 중복은 금지됩니다"
+        enabled: true
+        pattern:
+          type: "method-analysis"
+          conditions:
+            - "duplicate-code-block"
+        custom:
+          rule_id: "CQ-001"
+
+      # ==================== N+1 쿼리 (반복문 내 DB 작업) ====================
+      - id: "java-n-plus-one-query"
+        name: "N+1 쿼리 문제 (반복문 내 DB 작업)"
+        severity: "high"
+        category: "performance"
+        description: "반복문 내 DB 작업은 N+1 또는 N×M 성능 문제를 유발합니다"
+        enabled: true
+
+  - language: xml
+    rules:
+      # ==================== MyBatis 규칙 ====================
+      - id: "quality-mb-001"
+        name: "SQL_ID 주석 누락"
+        severity: "critical"
+        category: "mybatis"
+        description: "모든 SQL에 SQL_ID 주석이 필요합니다 (/* SQL_ID : [패키지명].[클래스명].[메소드명] */)"
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "<(select|insert|update|delete)\\s[^>]*>(?!\\s*/\\*\\s*SQL_ID)"
+        custom:
+          rule_id: "MB-001"
+          expected_format: "/* SQL_ID : [패키지명].[클래스명].[메소드명] */"
+
+      - id: "quality-mb-201"
+        name: "Mapper namespace 누락"
+        severity: "critical"
+        category: "mybatis"
+        description: "XML Mapper에 namespace가 필수입니다"
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "<mapper(?!\\s+namespace)"
+        custom:
+          rule_id: "MB-201"
+
+      # ==================== MyBatis 크로스파일 분석 ====================
+      - id: "quality-mybatis-unused-001"
+        name: "미사용 MyBatis SQL ID"
+        severity: "medium"
+        category: "dead-code"
+        description: "MyBatis XML의 SQL ID가 Java 코드에서 사용되지 않습니다. 불필요한 SQL 매핑을 제거하세요."
+        enabled: true
+        pattern:
+          type: "cross-file"
+        custom:
+          rule_id: "MYBATIS-UNUSED-001"
+          fix: "사용하지 않는 SQL 매핑을 제거하거나, 대응하는 Mapper 인터페이스 메서드를 추가하세요"
+
+      - id: "quality-mapper-no-xml-001"
+        name: "Mapper 메서드에 대응 XML SQL ID 없음"
+        severity: "high"
+        category: "cross-file"
+        description: "Mapper 인터페이스 메서드에 대응하는 XML SQL ID가 없습니다. 런타임 BindingException이 발생합니다."
+        enabled: true
+        pattern:
+          type: "cross-file"
+        custom:
+          rule_id: "MAPPER-NO-XML-001"
+          fix: "XML Mapper에 대응하는 <select/insert/update/delete id=\"메서드명\">을 추가하세요"
+
+      - id: "quality-resultmap-vo-001"
+        name: "resultMap property와 VO 필드 불일치"
+        severity: "high"
+        category: "cross-file"
+        description: "resultMap의 property가 VO/DTO 클래스에 존재하지 않습니다. 런타임에 매핑이 실패하거나 null이 됩니다."
+        enabled: true
+        pattern:
+          type: "cross-file"
+        custom:
+          rule_id: "RESULTMAP-VO-001"
+          fix: "VO 클래스에 해당 필드를 추가하거나, resultMap의 property명을 수정하세요"
+
+  - language: java
+    rules:
+      # ==================== 크로스파일 분석 (Java) ====================
+      - id: "quality-unused-service-001"
+        name: "미사용 Service 메서드"
+        severity: "medium"
+        category: "dead-code"
+        description: "Service 메서드가 다른 파일(Controller, 다른 Service)에서 호출되지 않습니다."
+        enabled: true
+        pattern:
+          type: "cross-file"
+        custom:
+          rule_id: "UNUSED-SERVICE-001"
+          fix: "사용하지 않는 Service 메서드를 제거하세요"
+
+      - id: "quality-unused-vo-001"
+        name: "미사용 VO/DTO 파일"
+        severity: "medium"
+        category: "dead-code"
+        description: "VO/DTO 클래스가 다른 파일에서 전혀 참조되지 않습니다."
+        enabled: true
+        pattern:
+          type: "cross-file"
+        custom:
+          rule_id: "UNUSED-VO-001"
+          fix: "사용하지 않는 VO/DTO 파일을 삭제하세요"
+
+      - id: "quality-unused-injection-001"
+        name: "미사용 DI 주입 필드"
+        severity: "medium"
+        category: "dead-code"
+        description: "@Autowired/@Resource로 주입된 필드가 클래스에서 사용되지 않습니다."
+        enabled: true
+        pattern:
+          type: "cross-file"
+        custom:
+          rule_id: "UNUSED-INJECTION-001"
+          fix: "사용하지 않는 주입 필드를 제거하세요"
+
+      - id: "quality-controller-direct-mapper-001"
+        name: "Controller→Mapper 직접 주입"
+        severity: "high"
+        category: "architecture"
+        description: "Controller에서 Mapper/Repository를 직접 주입하면 계층 구조(Controller→Service→Mapper) 원칙을 위반합니다."
+        enabled: true
+        pattern:
+          type: "cross-file"
+        custom:
+          rule_id: "CTRL-DIRECT-MAPPER-001"
+          fix: "Service 레이어를 통해 Mapper에 접근하세요"
+
+      - id: "quality-mapper-no-xml-file-001"
+        name: "Mapper 인터페이스에 대응 XML 파일 없음"
+        severity: "high"
+        category: "cross-file"
+        description: "Mapper 인터페이스에 대응하는 MyBatis XML 파일이 존재하지 않습니다."
+        enabled: true
+        pattern:
+          type: "cross-file"
+        custom:
+          rule_id: "MAPPER-NO-XML-FILE-001"
+          fix: "MyBatis XML 파일을 생성하고 namespace를 Mapper FQN과 일치시키세요"
+
+      - id: "quality-service-circular-001"
+        name: "Service 순환 의존성"
+        severity: "critical"
+        category: "architecture"
+        description: "Service 간 순환 의존성이 감지되었습니다. 초기화 실패나 유지보수 어려움을 초래합니다."
+        enabled: true
+        pattern:
+          type: "cross-file"
+        custom:
+          rule_id: "SERVICE-CIRCULAR-001"
+          fix: "의존성 역전(DIP), 이벤트 기반 통신, 또는 공통 서비스 추출로 순환을 제거하세요"
+
+  - language: xml
+    rules:
+      # ==================== MyBatis 크로스파일 분석 (추가) ====================
+      - id: "quality-mybatis-ns-mismatch-001"
+        name: "MyBatis XML namespace 불일치"
+        severity: "high"
+        category: "cross-file"
+        description: "MyBatis XML의 namespace에 대응하는 Java Mapper 클래스가 존재하지 않습니다."
+        enabled: true
+        pattern:
+          type: "cross-file"
+        custom:
+          rule_id: "MYBATIS-NS-MISMATCH-001"
+          fix: "XML namespace를 실제 Java Mapper 인터페이스의 FQN과 일치시키세요"
+
+      - id: "quality-duplicate-sql-id-001"
+        name: "중복 MyBatis SQL ID"
+        severity: "medium"
+        category: "cross-file"
+        description: "동일한 SQL ID가 여러 MyBatis XML에서 중복 사용됩니다."
+        enabled: true
+        pattern:
+          type: "cross-file"
+        custom:
+          rule_id: "DUPLICATE-SQL-ID-001"
+          fix: "SQL ID를 고유하게 변경하거나 namespace.id 형식으로 참조하세요"
+
+      # ==================== 크로스파일 규칙 (SuperClass/Interfaces 활용) ====================
+
+      - id: "quality-service-no-interface-001"
+        name: "ServiceImpl이 Service 인터페이스를 미구현"
+        severity: "medium"
+        category: "architecture"
+        description: "ServiceImpl 클래스가 Service 인터페이스를 구현하지 않습니다. 인터페이스 기반 설계 원칙 위반입니다."
+        enabled: true
+        pattern:
+          type: "cross-file"
+        custom:
+          fix: "Service 인터페이스를 생성하고 implements 절을 추가하세요"
+
+      - id: "quality-deep-inheritance-001"
+        name: "깊은 상속 체인 감지"
+        severity: "medium"
+        category: "architecture"
+        description: "상속 깊이가 3단계 이상입니다. 깊은 상속은 결합도를 높이고 유지보수를 어렵게 합니다."
+        enabled: true
+        pattern:
+          type: "cross-file"
+        custom:
+          max_depth: 3
+          fix: "상속 대신 컴포지션(Composition) 패턴을 사용하세요"
+
+      - id: "quality-vo-extends-001"
+        name: "VO/DTO 상속 감지"
+        severity: "low"
+        category: "architecture"
+        description: "VO/DTO 클래스가 다른 VO/DTO를 상속합니다. 데이터 결합도가 높아집니다."
+        enabled: true
+        pattern:
+          type: "cross-file"
+        custom:
+          fix: "컴포지션(필드로 포함)을 사용하거나 공통 필드를 각 VO에 직접 선언하세요"
+
+  - language: javascript
+    rules:
+      - id: "quality-js-console"
+        name: "console.log 사용"
+        severity: "medium"
+        category: "logging"
+        description: "프로덕션 코드에서 console.log 사용은 권장되지 않습니다"
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "console\\.(log|warn|error|info|debug)"
+        custom:
+          rule_id: "LG-001-JS"
+
+      - id: "quality-js-var"
+        name: "var 키워드 사용"
+        severity: "medium"
+        category: "style"
+        description: "var 대신 let 또는 const를 사용하세요"
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "\\bvar\\s+\\w+"
+        custom:
+          rule_id: "JS-001"
+
+      - id: "quality-js-equality"
+        name: "동등 연산자(==) 사용"
+        severity: "medium"
+        category: "style"
+        description: "== 대신 === (일치 연산자)를 사용하세요"
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "[^!=]==[^=]"
+        custom:
+          rule_id: "JS-002"
+
+      - id: "quality-js-fn-001"
+        name: "번호 붙은 함수명 (복사-붙여넣기 의심)"
+        severity: "medium"
+        category: "code-smell"
+        description: "함수명에 번호가 붙어있습니다 (fn_save2, fn_list3). 복사-붙여넣기로 생성된 중복 함수일 수 있습니다."
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "function\\s+\\w+\\d+\\s*\\("
+        custom:
+          rule_id: "JS-FN-001"
+          fix: "중복 함수를 파라미터화하여 하나로 통합하세요"
+
+      - id: "quality-js-callback-001"
+        name: "콜백 중첩 과다 (Callback Hell)"
+        severity: "medium"
+        category: "code-smell"
+        description: "콜백 함수가 4단계 이상 중첩되어 있습니다. Promise나 async/await로 리팩토링하세요."
+        enabled: true
+        pattern:
+          type: "regex-multiline"
+          regex: "function\\s*\\([^)]*\\)\\s*\\{[\\s\\S]{0,500}function\\s*\\([^)]*\\)\\s*\\{[\\s\\S]{0,500}function\\s*\\([^)]*\\)\\s*\\{[\\s\\S]{0,500}function\\s*\\("
+        custom:
+          rule_id: "JS-CALLBACK-001"
+          fix: "Promise 체이닝이나 async/await로 평탄화하세요"
+
+  - language: html
+    rules:
+      - id: "quality-html-inline-style"
+        name: "인라인 스타일 사용"
+        severity: "medium"
+        category: "style"
+        description: "인라인 style 속성 대신 CSS 파일을 사용하세요"
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "\\sstyle\\s*="
+        custom:
+          rule_id: "HTML-001"
+
+      - id: "quality-html-inline-script"
+        name: "인라인 스크립트 사용"
+        severity: "medium"
+        category: "style"
+        description: "인라인 스크립트 대신 외부 JS 파일을 사용하세요"
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "\\s(onclick|onchange|onsubmit|onload)\\s*="
+        custom:
+          rule_id: "HTML-002"
+
+  - language: css
+    rules:
+      - id: "quality-css-important"
+        name: "!important 남용"
+        severity: "medium"
+        category: "maintainability"
+        description: "!important의 과도한 사용은 유지보수성을 저하시킵니다"
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "!important"
+        custom:
+          rule_id: "CSS-001"
+
+  - language: properties
+    rules:
+      - id: "quality-prop-001"
+        name: "프로퍼티 형식 위반"
+        severity: "high"
+        category: "configuration"
+        description: "프로퍼티는 key=value 형식이어야 합니다"
+        enabled: false
+        pattern:
+          type: "regex"
+          regex: "^[^=#][^=]*[^=]$"
+        custom:
+          rule_id: "PROP-001"
+
+# ==================== 리팩토링 권장 규칙 ====================
+# 추가일: 2025-01-27
+# 목적: Java Spring 비즈니스 로직 개발 시 코드 품질 향상
+
+  - language: java
+    rules:
+      # ==================== 성능 관련 규칙 ====================
+      - id: "quality-perf-001"
+        name: "String += 문자열 연결"
+        severity: "medium"
+        category: "performance"
+        description: "String += 연산은 루프에서 사용 시 성능 저하를 유발합니다. StringBuilder 사용을 권장합니다."
+        enabled: true
+        pattern:
+          type: "regex-multiline"
+          regex: "(for|while)\\s*\\([^)]*\\)\\s*\\{[^}]*\\w+\\s*\\+=\\s*\"[^\"]*\""
+        exclude:
+          - "StringBuilder"
+          - "StringBuffer"
+        custom:
+          rule_id: "PERF-001"
+          fix: "StringBuilder를 사용하세요"
+          example: "StringBuilder sb = new StringBuilder(); sb.append(str);"
+
+      # ==================== 멀티라인 성능 규칙 ====================
+      - id: "quality-perf-002"
+        name: "루프 내 컬렉션 객체 생성"
+        severity: "medium"
+        category: "performance"
+        description: "루프 내에서 ArrayList/HashMap 등 컬렉션을 생성하면 불필요한 객체 생성이 발생합니다."
+        enabled: true
+        pattern:
+          type: "regex-multiline"
+          regex: "(for|while)\\s*\\([^)]*\\)\\s*\\{[^}]*new\\s+(ArrayList|HashMap|HashSet|LinkedList|TreeMap|TreeSet)\\s*[<(]"
+        custom:
+          rule_id: "PERF-002"
+          fix: "루프 외부에서 컬렉션을 생성하고 clear()로 재사용하거나 Stream API 사용"
+          example: "List<Item> list = new ArrayList<>(); for(...) { list.clear(); ... }"
+
+      - id: "quality-perf-003"
+        name: "조회 메서드 @Transactional readOnly 누락"
+        severity: "medium"
+        category: "performance"
+        description: "조회 전용 메서드는 @Transactional(readOnly = true)를 사용하면 성능이 향상됩니다."
+        enabled: true
+        pattern:
+          type: "regex-multiline"
+          regex: "@Transactional\\s*\\((?![^)]*readOnly\\s*=\\s*true)[^)]*\\)\\s+(public|protected)[^{]*(find|get|select|search|inquiry|retrieve)[A-Z]\\w*\\s*\\("
+        custom:
+          rule_id: "PERF-003"
+          fix: "@Transactional(readOnly = true) 사용"
+          example: "@Transactional(readOnly = true) public User findById(Long id) { ... }"
+
+      # ==================== 설계/구조 관련 규칙 ====================
+      - id: "quality-di-001"
+        name: "@Autowired 필드 주입 사용"
+        severity: "medium"
+        category: "design"
+        description: "필드 주입보다 생성자 주입을 권장합니다. 테스트 용이성과 불변성이 향상됩니다."
+        enabled: false  # spring-di-001과 중복 — spring 프로파일 규칙으로 통합
+        pattern:
+          type: "ast-annotation"
+          annotation: "^Autowired$"
+        custom:
+          rule_id: "DI-001"
+          target_element: "field"
+          fix: "생성자 주입으로 변경하세요"
+          example: "private final UserService userService; public MyClass(UserService userService) { this.userService = userService; }"
+
+      # ==================== 코드 품질 관련 규칙 ====================
+      - id: "quality-optional-001"
+        name: "Optional.get() 직접 호출"
+        severity: "high"
+        category: "code-quality"
+        description: "Optional.get()은 NoSuchElementException을 발생시킬 수 있습니다. orElse(), orElseThrow()를 사용하세요."
+        enabled: false
+        pattern:
+          type: "regex"
+          regex: "\\.get\\s*\\(\\s*\\)\\s*(?!\\.|;.*\\.)"
+        exclude:
+          - "request\\.get"
+          - "map\\.get"
+          - "list\\.get"
+          - "session\\.get"
+        custom:
+          rule_id: "OPT-001"
+          fix: "orElse(), orElseGet(), orElseThrow() 사용"
+          example: "optional.orElseThrow(() -> new BusinessException(\"Not found\"))"
+
+      - id: "quality-todo-001"
+        name: "TODO/FIXME 주석 잔존"
+        severity: "low"
+        category: "maintainability"
+        description: "TODO/FIXME 주석이 남아있습니다. 완료 후 제거하거나 이슈 트래커로 이동하세요."
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "//\\s*(TODO|FIXME|XXX|HACK)"
+        custom:
+          rule_id: "TODO-001"
+          fix: "작업 완료 후 주석 제거 또는 이슈 트래커 등록"
+
+      # ==================== 동시성 관련 규칙 ====================
+      - id: "quality-sync-001"
+        name: "synchronized 메서드 사용"
+        severity: "low"
+        category: "concurrency"
+        description: "synchronized 메서드보다 명시적 Lock 사용이 더 세밀한 제어가 가능합니다."
+        enabled: false
+        pattern:
+          type: "regex"
+          regex: "public\\s+synchronized\\s+\\w+\\s+\\w+\\s*\\("
+        custom:
+          rule_id: "SYNC-001"
+          fix: "ReentrantLock 또는 synchronized 블록 사용 검토"
+          example: "private final Lock lock = new ReentrantLock(); lock.lock(); try { ... } finally { lock.unlock(); }"
+
+      # ==================== 클래스/메서드 구조 규칙 (Stage 2) ====================
+      - id: "java-god-class"
+        name: "God Class (과대 클래스)"
+        severity: "medium"
+        category: "design"
+        description: "클래스가 너무 많은 메서드나 필드를 가지고 있습니다. 단일 책임 원칙(SRP)을 위반할 수 있습니다. VO/DTO/Mapper는 제외됩니다."
+        enabled: true
+        pattern:
+          type: "method-analysis"
+          conditions:
+            - "god-class-check"
+        custom:
+          rule_id: "DESIGN-001"
+          max_methods: "30"
+          max_fields: "25"
+          fix: "클래스를 더 작은 단위로 분리하세요"
+
+      - id: "java-parameter-count"
+        name: "파라미터 개수 초과"
+        severity: "medium"
+        category: "design"
+        description: "메서드 파라미터가 너무 많습니다. 파라미터 객체 패턴 사용을 고려하세요."
+        enabled: true
+        pattern:
+          type: "method-analysis"
+          conditions:
+            - "parameter-count-check"
+        custom:
+          rule_id: "DESIGN-002"
+          max_params: "5"
+          fix: "파라미터 객체(DTO)로 그룹화하거나 Builder 패턴 사용"
+
+      - id: "java-long-method"
+        name: "긴 메서드"
+        severity: "medium"
+        category: "maintainability"
+        description: "메서드가 너무 깁니다. 가독성과 유지보수성을 위해 분리하세요."
+        enabled: true
+        pattern:
+          type: "method-analysis"
+          conditions:
+            - "long-method-check"
+        custom:
+          rule_id: "DESIGN-003"
+          max_lines: "60"
+          fix: "메서드를 더 작은 단위로 분리하세요 (Extract Method 리팩토링)"
+
+      # ==================== 아키텍처/계층 구조 규칙 (Stage 3) ====================
+      - id: "java-controller-repository"
+        name: "Controller→Repository 직접 의존"
+        severity: "high"
+        category: "architecture"
+        description: "Controller에서 Repository/DAO를 직접 주입하면 계층 구조(Controller→Service→Repository) 원칙을 위반합니다."
+        enabled: true
+        pattern:
+          type: "method-analysis"
+          conditions:
+            - "controller-repository-dependency"
+        custom:
+          rule_id: "ARCH-001"
+          fix: "Service 레이어를 생성하고 비즈니스 로직을 Service로 이동하세요"
+
+      # ==================== Stream API 안티패턴 규칙 (Stage 3) ====================
+      - id: "quality-stream-001"
+        name: "불필요한 stream().forEach()"
+        severity: "low"
+        category: "performance"
+        description: "Collection에 대해 .stream().forEach()는 .forEach()로 간소화할 수 있습니다."
+        enabled: true
+        pattern:
+          type: "ast-filtered-regex"
+          regex: "\\.stream\\(\\)\\.forEach\\("
+        custom:
+          rule_id: "STREAM-001"
+          fix: "collection.forEach()를 직접 사용하세요"
+
+      - id: "quality-stream-002"
+        name: "Stream collect 후 재stream"
+        severity: "medium"
+        category: "performance"
+        description: "collect() 후 다시 stream()하는 것은 불필요한 중간 컬렉션을 생성합니다."
+        enabled: true
+        pattern:
+          type: "regex-multiline"
+          regex: "\\.collect\\([^)]*(?:\\([^)]*\\))*[^)]*\\)\\s*\\.stream\\(\\)"
+        custom:
+          rule_id: "STREAM-002"
+          fix: "중간 collect() 없이 stream 파이프라인을 연결하세요"
+
+      - id: "quality-stream-003"
+        name: "Stream에서 null 반환"
+        severity: "high"
+        category: "quality"
+        description: "Stream 연산에서 null을 반환하면 NullPointerException이 발생할 수 있습니다."
+        enabled: true
+        pattern:
+          type: "ast-filtered-regex"
+          regex: "\\.(map|flatMap)\\([^)]*->\\s*null\\s*\\)"
+        custom:
+          rule_id: "STREAM-003"
+          fix: "Optional 또는 Stream.empty()를 반환하세요"
+
+      # ==================== 아키텍처 규칙 (Stage 4) ====================
+      - id: "java-enhanced-layer-violation"
+        name: "계층 아키텍처 위반"
+        severity: "high"
+        category: "architecture"
+        description: "계층 구조(Controller→Service→Repository→Entity)를 위반하는 의존성이 감지되었습니다."
+        enabled: true
+        pattern:
+          type: "method-analysis"
+          conditions:
+            - "enhanced-layer-violation"
+        custom:
+          rule_id: "ARCH-002"
+          layers: "Controller→Service→Repository→Entity"
+          fix: "상위 계층만 하위 계층에 의존해야 합니다"
+
+      - id: "java-circular-dependency"
+        name: "순환 의존성 감지"
+        severity: "critical"
+        category: "architecture"
+        description: "순환 의존성(Circular Dependency)이 감지되었습니다. 애플리케이션 초기화 실패 또는 유지보수 어려움을 초래합니다."
+        enabled: true
+        pattern:
+          type: "method-analysis"
+          conditions:
+            - "circular-dependency"
+        custom:
+          rule_id: "ARCH-003"
+          fix: "의존성 역전(DIP), 이벤트 기반 통신, 또는 공통 서비스 추출로 순환을 제거하세요"
+
+      # java-n-plus-one-query: 중복 제거 — Go 구현 버전(line 425)으로 통합
+      # (이전: method-analysis 타입, PERF-004)
+
+      # ==================== 리팩토링 규칙 (sample-java 기반) ====================
+      # 추가일: 2026-01-27
+      # 목적: 전자정부 프레임워크 Spring 프로젝트에서 발견된 공통 코드 스멜 탐지
+
+      - id: "quality-str-001"
+        name: "String == / != 비교"
+        severity: "high"
+        category: "code-quality"
+        description: "Java에서 문자열을 ==, != 연산자로 비교하면 참조 비교가 되어 의도와 다른 결과가 발생합니다. .equals() 또는 Objects.equals()를 사용하세요."
+        enabled: true
+        pattern:
+          type: "ast-filtered-regex"
+          regex: "\\)\\s*[!=]=\\s*\"[^\"]*\""
+        custom:
+          rule_id: "STR-001"
+          fix: ".equals() 또는 Objects.equals()를 사용하세요"
+          example: "if (\"Y\".equals(str)) { ... }"
+
+      - id: "quality-deprecated-001"
+        name: "SimpleDateFormat 사용"
+        severity: "medium"
+        category: "deprecated"
+        description: "SimpleDateFormat은 thread-unsafe하고 Java 8 이후 권장되지 않습니다. DateTimeFormatter를 사용하세요."
+        enabled: true
+        pattern:
+          type: "ast-filtered-regex"
+          regex: "new\\s+SimpleDateFormat\\s*\\("
+        custom:
+          rule_id: "DEPR-001"
+          fix: "java.time.format.DateTimeFormatter를 사용하세요"
+          example: "DateTimeFormatter.ofPattern(\"yyyyMMddHHmmss\").format(LocalDateTime.now())"
+
+      - id: "quality-deprecated-003"
+        name: "Hibernate @NotEmpty 사용"
+        severity: "medium"
+        category: "deprecated"
+        description: "org.hibernate.validator.constraints.NotEmpty는 deprecated입니다. javax/jakarta.validation.constraints를 사용하세요."
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "import\\s+org\\.hibernate\\.validator\\.constraints\\.(NotEmpty|NotBlank)"
+        custom:
+          rule_id: "DEPR-003"
+          fix: "javax.validation.constraints.NotEmpty 또는 jakarta.validation.constraints.NotEmpty를 사용하세요"
+
+      - id: "quality-refactor-001"
+        name: "StringBuffer 사용"
+        severity: "low"
+        category: "performance"
+        description: "StringBuffer는 synchronized로 인해 단일 스레드 환경에서 불필요한 성능 오버헤드가 있습니다. StringBuilder를 사용하세요."
+        enabled: true
+        pattern:
+          type: "ast-filtered-regex"
+          regex: "new\\s+StringBuffer\\s*\\("
+        custom:
+          rule_id: "REFACTOR-001"
+          fix: "StringBuilder를 사용하세요"
+          example: "StringBuilder sb = new StringBuilder();"
+
+      - id: "quality-refactor-002"
+        name: "빈 else 블록"
+        severity: "medium"
+        category: "code-quality"
+        description: "빈 else 블록은 불필요한 코드입니다. 제거하거나 주석으로 의도를 명시하세요."
+        enabled: true
+        pattern:
+          type: "ast-filtered-regex"
+          regex: "\\}\\s*else\\s*\\{\\s*\\}"
+        custom:
+          rule_id: "REFACTOR-002"
+          fix: "빈 else 블록을 제거하세요"
+
+      - id: "quality-refactor-003"
+        name: "DAO insert()로 update/delete 수행"
+        severity: "high"
+        category: "code-quality"
+        description: "update/delete 메서드에서 insert()를 호출하면 시맨틱 불일치로 유지보수가 어렵습니다."
+        enabled: true
+        pattern:
+          type: "regex-multiline"
+          regex: "(update|delete|modify)\\w*\\([^)]*\\)\\s*(throws[^{]*)?\\{[^}]*\\binsert\\s*\\("
+        custom:
+          rule_id: "REFACTOR-003"
+          fix: "update 메서드는 update(), delete 메서드는 delete()를 사용하세요"
+
+      - id: "quality-refactor-004"
+        name: "하드코딩 업무코드"
+        severity: "low"
+        category: "maintainability"
+        description: "업무코드(예: BZ1801, QA0401)가 하드코딩되어 있습니다. 상수(Enum/Constants)로 정의하세요."
+        enabled: true
+        pattern:
+          type: "ast-filtered-regex"
+          regex: "\"[A-Z]{2}\\d{4}\""
+        custom:
+          rule_id: "REFACTOR-004"
+          fix: "업무코드를 상수 클래스(Enum 또는 Constants)로 정의하세요"
+          example: "public enum BizCode { TEMP_SAVE(\"BZ1801\"), ... }"
+
+      # ==================== Map 남용 검출 ====================
+      - id: "quality-map-param-001"
+        name: "메서드 파라미터에 Map<String, Object> 사용"
+        severity: "medium"
+        category: "design"
+        description: "메서드 파라미터로 Map<String, Object>를 사용하면 타입 안전성이 없고, 어떤 키가 필요한지 코드만으로 알 수 없습니다. VO/DTO 클래스를 정의하세요."
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "\\b(public|protected|private)\\s+\\S+\\s+\\w+\\s*\\(.*Map<String,\\s*Object>.*\\)"
+        custom:
+          rule_id: "MAP-001"
+          fix: "Map<String, Object> 대신 전용 VO/DTO 클래스를 파라미터로 사용하세요"
+          example: "public void updateUser(UserUpdateDto dto) { ... }"
+
+      - id: "quality-map-return-001"
+        name: "메서드 반환 타입에 Map<String, Object> 사용"
+        severity: "medium"
+        category: "design"
+        description: "반환 타입으로 Map<String, Object>를 사용하면 호출자가 어떤 키가 들어있는지 알 수 없어 런타임 오류 위험이 있습니다. VO/DTO 클래스를 정의하세요."
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "\\b(public|protected|private)\\s+Map<String,\\s*Object>\\s+\\w+\\s*\\("
+        custom:
+          rule_id: "MAP-002"
+          fix: "Map<String, Object> 대신 전용 VO/DTO 클래스를 반환 타입으로 사용하세요"
+          example: "public UserInfoDto selectUserInfo(Long userId) { ... }"
+
+      # ==================== AST 쿼리 선언적 규칙 ====================
+      # 추가일: 2026-02-14
+      # 목적: YAML만으로 AST 기반 검사 규칙 추가 (ast-method-call, ast-annotation, ast-import, ast-variable, ast-try-catch, ast-class)
+
+      # --- ast-method-call: 메서드 호출 패턴 ---
+
+      # quality-ast-001: 중복 제거 — java-n-plus-one-query(Go 구현)로 통합
+      # (이전: ast-method-call 타입, inside-loop context)
+
+      - id: "quality-ast-002"
+        name: "루프 내 DB 변경 호출"
+        severity: "high"
+        category: "performance"
+        description: "루프 안에서 INSERT/UPDATE/DELETE를 개별 호출하면 성능이 저하됩니다. 배치 처리를 사용하세요."
+        enabled: true
+        pattern:
+          type: "ast-method-call"
+          method: "^(insert|update|delete|save|merge).*"
+          qualifier: ".*(?i)(dao|repository|mapper)"
+          context: "inside-loop"
+        custom:
+          fix: "Batch Insert/Update 또는 addBatch()/executeBatch()를 사용하세요"
+
+      - id: "quality-ast-003"
+        name: "루프 내 원격 API 호출"
+        severity: "high"
+        category: "performance"
+        description: "루프 안에서 외부 API를 호출하면 응답시간이 누적됩니다. 병렬 처리나 벌크 API를 사용하세요."
+        enabled: true
+        pattern:
+          type: "ast-method-call"
+          method: "^(exchange|execute|getForObject|getForEntity|postForObject|postForEntity|send|call).*"
+          qualifier: ".*(?i)(restTemplate|webClient|httpClient|apiUtil|feignClient)"
+          context: "inside-loop"
+        custom:
+          fix: "벌크 API 호출 또는 CompletableFuture 병렬 처리를 사용하세요"
+
+      # --- ast-import: import 패턴 ---
+
+      - id: "quality-ast-004"
+        name: "java.util.Date import"
+        severity: "medium"
+        category: "deprecated"
+        description: "java.util.Date는 thread-unsafe하고 설계 결함이 있습니다. Java 8+ java.time API를 사용하세요."
+        enabled: true
+        pattern:
+          type: "ast-import"
+          import: "^java\\.util\\.Date$"
+        custom:
+          fix: "java.time.LocalDate, LocalDateTime, ZonedDateTime 등을 사용하세요"
+
+      - id: "quality-ast-005"
+        name: "commons-lang 구버전 import"
+        severity: "medium"
+        category: "deprecated"
+        description: "org.apache.commons.lang 패키지는 EOL입니다. commons-lang3(org.apache.commons.lang3)를 사용하세요."
+        enabled: true
+        pattern:
+          type: "ast-import"
+          import: "^org\\.apache\\.commons\\.lang\\."
+        custom:
+          fix: "org.apache.commons.lang3 패키지로 마이그레이션하세요"
+
+      - id: "quality-ast-006"
+        name: "sun.* 내부 API import"
+        severity: "high"
+        category: "deprecated"
+        description: "sun.* 패키지는 JDK 내부 API로 호환성이 보장되지 않습니다."
+        enabled: true
+        pattern:
+          type: "ast-import"
+          import: "^sun\\."
+        custom:
+          fix: "공식 Java API 또는 표준 라이브러리를 사용하세요"
+
+      # --- ast-try-catch: 예외 처리 패턴 ---
+
+      - id: "quality-ast-007"
+        name: "빈 catch 블록 (AST)"
+        severity: "critical"
+        category: "exception"
+        description: "catch 블록이 비어있으면 예외가 무시됩니다. 최소한 로깅을 추가하세요."
+        enabled: true
+        pattern:
+          type: "ast-try-catch"
+        custom:
+          catch_is_empty: true
+          fix: "catch 블록에 logger.error(\"message\", e)를 추가하세요"
+
+      - id: "quality-ast-008"
+        name: "IOException/SQLException try-with-resources 미사용"
+        severity: "medium"
+        category: "resource"
+        description: "IO/DB 관련 예외를 처리할 때 try-with-resources를 사용하면 리소스 누수를 방지할 수 있습니다."
+        enabled: true
+        pattern:
+          type: "ast-try-catch"
+          exception_type: "IOException|SQLException|FileNotFoundException"
+        custom:
+          has_resources: false
+          has_finally: false
+          fix: "try-with-resources 구문을 사용하세요: try (Resource r = new Resource()) { ... }"
+
+      # --- ast-class: 클래스 구조 패턴 ---
+
+      - id: "quality-ast-009"
+        name: "ServiceImpl 과대 클래스"
+        severity: "medium"
+        category: "design"
+        description: "ServiceImpl 클래스의 메서드가 너무 많습니다. 책임을 분리하세요."
+        enabled: true
+        pattern:
+          type: "ast-class"
+          name_pattern: ".*ServiceImpl$"
+        custom:
+          max_methods: 20
+          fix: "도메인별로 Service 클래스를 분리하세요"
+
+      - id: "quality-ast-010"
+        name: "Controller 과대 클래스"
+        severity: "medium"
+        category: "design"
+        description: "Controller 클래스의 메서드가 너무 많습니다. 기능별로 분리하세요."
+        enabled: true
+        pattern:
+          type: "ast-class"
+          name_pattern: ".*Controller$"
+        custom:
+          max_methods: 15
+          fix: "기능 단위로 Controller를 분리하세요 (예: UserController, OrderController)"
+
+      # --- ast-annotation: 어노테이션 패턴 ---
+
+      - id: "quality-ast-011"
+        name: "@RequestMapping method 속성 누락"
+        severity: "medium"
+        category: "design"
+        description: "@RequestMapping에 method 속성이 없으면 모든 HTTP 메서드를 허용합니다. @GetMapping/@PostMapping 등 전용 어노테이션을 사용하세요."
+        enabled: true
+        pattern:
+          type: "ast-annotation"
+          annotation: "^RequestMapping$"
+          missing_attr_name: "method"
+          context: "method-name:.*"
+        custom:
+          fix: "@GetMapping, @PostMapping, @PutMapping, @DeleteMapping 전용 어노테이션을 사용하세요"
+
+      # ==================== 추가 품질 규칙 (2026-02-14) ====================
+
+      - id: "quality-legacy-001"
+        name: "Vector 사용"
+        severity: "medium"
+        category: "deprecated"
+        description: "Vector는 synchronized로 인해 단일 스레드 환경에서 불필요한 성능 오버헤드가 있습니다."
+        enabled: true
+        pattern:
+          type: "ast-filtered-regex"
+          regex: "new\\s+Vector\\s*[<(]"
+        custom:
+          rule_id: "LEGACY-001"
+          fix: "ArrayList(단일스레드) 또는 CopyOnWriteArrayList(멀티스레드)를 사용하세요"
+
+      - id: "quality-legacy-002"
+        name: "Hashtable 사용"
+        severity: "medium"
+        category: "deprecated"
+        description: "Hashtable은 synchronized로 인해 불필요한 오버헤드가 있고 null 키/값을 허용하지 않습니다."
+        enabled: true
+        pattern:
+          type: "ast-filtered-regex"
+          regex: "new\\s+Hashtable\\s*[<(]"
+        custom:
+          rule_id: "LEGACY-002"
+          fix: "HashMap(단일스레드) 또는 ConcurrentHashMap(멀티스레드)를 사용하세요"
+
+      - id: "quality-legacy-003"
+        name: "StringTokenizer 사용"
+        severity: "low"
+        category: "deprecated"
+        description: "StringTokenizer는 레거시 클래스입니다. String.split() 또는 Pattern을 사용하세요."
+        enabled: true
+        pattern:
+          type: "ast-filtered-regex"
+          regex: "new\\s+StringTokenizer\\s*\\("
+        custom:
+          rule_id: "LEGACY-003"
+          fix: "String.split() 또는 java.util.regex.Pattern을 사용하세요"
+
+      - id: "quality-legacy-004"
+        name: "HSSFWorkbook 사용 (Excel 97-2003)"
+        severity: "medium"
+        category: "deprecated"
+        description: "HSSFWorkbook은 .xls(97-2003) 전용으로 65,536행 제한이 있습니다."
+        enabled: true
+        pattern:
+          type: "ast-filtered-regex"
+          regex: "new\\s+HSSFWorkbook\\s*\\("
+        custom:
+          rule_id: "LEGACY-004"
+          fix: "SXSSFWorkbook(대용량 스트리밍) 또는 XSSFWorkbook(.xlsx)을 사용하세요"
+
+      - id: "quality-legacy-005"
+        name: "Enumeration 인터페이스 사용"
+        severity: "low"
+        category: "deprecated"
+        description: "Enumeration은 레거시 인터페이스입니다. Iterator 또는 for-each를 사용하세요."
+        enabled: true
+        pattern:
+          type: "ast-filtered-regex"
+          regex: "\\bEnumeration\\s*<"
+        custom:
+          rule_id: "LEGACY-005"
+          fix: "Iterator, for-each, 또는 Stream API를 사용하세요"
+
+      - id: "quality-legacy-006"
+        name: "log4j 1.x 직접 사용"
+        severity: "high"
+        category: "deprecated"
+        description: "Apache Log4j 1.x는 EOL이며 보안 취약점이 있습니다. SLF4J + Logback을 사용하세요."
+        enabled: true
+        pattern:
+          type: "ast-import"
+          import: "^org\\.apache\\.log4j\\."
+        custom:
+          rule_id: "LEGACY-006"
+          fix: "org.slf4j.Logger + Logback을 사용하세요"
+
+      - id: "quality-legacy-007"
+        name: "BeanUtils.copyProperties() 사용"
+        severity: "low"
+        category: "performance"
+        description: "BeanUtils.copyProperties()는 리플렉션 기반이라 성능이 낮고 타입 안전하지 않습니다."
+        enabled: true
+        pattern:
+          type: "ast-filtered-regex"
+          regex: "BeanUtils\\.copyProperties\\s*\\("
+        custom:
+          rule_id: "LEGACY-007"
+          fix: "MapStruct(컴파일타임 매핑) 또는 명시적 setter 호출을 사용하세요"
+
+      - id: "quality-legacy-008"
+        name: "static SimpleDateFormat 선언"
+        severity: "high"
+        category: "thread-safety"
+        description: "SimpleDateFormat을 static 필드로 선언하면 멀티스레드 환경에서 파싱 오류가 발생합니다."
+        enabled: true
+        pattern:
+          type: "ast-filtered-regex"
+          regex: "static\\s+.*SimpleDateFormat\\s+\\w+"
+        custom:
+          rule_id: "LEGACY-008"
+          fix: "DateTimeFormatter(thread-safe)를 사용하세요"
+
+      # ==================== 9. 메서드 구조 분석 (ast-method) ====================
+
+      - id: "quality-mth-001"
+        name: "깊은 if-else 중첩 (Arrow Anti-Pattern)"
+        severity: "high"
+        category: "complexity"
+        description: "if-else 중첩이 3단계를 초과합니다. Guard Clause나 early return으로 리팩토링하세요."
+        enabled: true
+        pattern:
+          type: "ast-method"
+        custom:
+          max_if_depth: 3
+          fix: "Guard Clause(early return) 패턴으로 중첩을 줄이세요"
+
+      - id: "quality-mth-002"
+        name: "만능 if-else 분기 (과도한 조건 분기)"
+        severity: "medium"
+        category: "complexity"
+        description: "if-else-if 분기가 5개를 초과합니다. 전략 패턴이나 Map 디스패치로 전환하세요."
+        enabled: true
+        pattern:
+          type: "ast-method"
+        custom:
+          max_branches: 5
+          fix: "전략 패턴(Strategy), Map 기반 디스패치, 또는 enum으로 전환하세요"
+
+      - id: "quality-mth-003"
+        name: "만능 메서드 (Long Method)"
+        severity: "high"
+        category: "complexity"
+        description: "메서드가 100라인을 초과합니다. 기능 단위로 분리하세요."
+        enabled: true
+        pattern:
+          type: "ast-method"
+        custom:
+          max_lines: 100
+          fix: "메서드를 조회/검증/처리/저장 등 기능 단위로 분리하세요"
+
+      - id: "quality-mth-004"
+        name: "과도한 statement 수"
+        severity: "medium"
+        category: "complexity"
+        description: "메서드 내 statement가 50개를 초과합니다."
+        enabled: true
+        pattern:
+          type: "ast-method"
+        custom:
+          max_statements: 50
+          fix: "private 메서드로 추출하여 가독성을 높이세요"
+
+      # ==================== 10. 레거시 코드 악취 (Legacy Code Smell) ====================
+
+      - id: "quality-magic-001"
+        name: "매직 스트링 비교"
+        severity: "medium"
+        category: "code-smell"
+        description: "숫자 문자열 리터럴을 직접 비교하고 있습니다. 상수를 정의하세요."
+        enabled: true
+        pattern:
+          type: "ast-filtered-regex"
+          regex: "\"[0-9]{1,3}\"\\s*\\.\\s*equals\\s*\\(|\\.equals\\s*\\(\\s*\"[0-9]{1,3}\"\\s*\\)"
+        custom:
+          rule_id: "MAGIC-001"
+          fix: "static final 상수를 정의하거나 enum을 사용하세요"
+
+      - id: "quality-cmt-003"
+        name: "주석 처리된 코드 블록"
+        severity: "low"
+        category: "code-smell"
+        description: "3줄 이상 주석 처리된 코드가 있습니다. 불필요한 코드는 삭제하세요."
+        enabled: true
+        pattern:
+          type: "regex-multiline"
+          regex: "([ \\t]*//[^\\n]*[;{}][ \\t]*\\n){3,}"
+        custom:
+          rule_id: "CMT-003"
+          fix: "VCS에 이력이 있으므로 주석 처리된 코드를 삭제하세요"
+
+      - id: "quality-ex-003"
+        name: "거대 try 블록"
+        severity: "medium"
+        category: "code-smell"
+        description: "try 블록이 50줄을 초과합니다. 예외 범위를 최소화하세요."
+        enabled: true
+        pattern:
+          type: "ast-try-catch"
+        custom:
+          max_try_lines: 50
+          fix: "try 범위를 최소화하고, 비즈니스 로직을 별도 메서드로 분리하세요"
+
+      - id: "quality-import-001"
+        name: "사용하지 않는 import"
+        severity: "low"
+        category: "code-smell"
+        description: "사용하지 않는 import가 있습니다. 코드 가독성을 위해 제거하세요."
+        enabled: true
+        pattern:
+          type: "ast-import"
+        custom:
+          check_unused: true
+          fix: "IDE의 Optimize Imports 기능으로 불필요한 import를 정리하세요"
+
+      - id: "quality-vo-001"
+        name: "VO/DTO 필드 전부 String"
+        severity: "medium"
+        category: "code-smell"
+        description: "VO/DTO 클래스의 모든 필드가 String입니다. 적절한 타입(int, long, LocalDate 등)을 사용하세요."
+        enabled: true
+        pattern:
+          type: "ast-class"
+          name_pattern: ".*(Vo|VO|Dto|DTO|RequestDto|ResponseDto)$"
+        custom:
+          all_fields_type: "String"
+          fix: "숫자는 int/long, 날짜는 LocalDate/LocalDateTime, 불리언은 boolean으로 선언하세요"
+
+      # ==================== 11. 리팩토링 코드 스멜 ====================
+
+      - id: "quality-chain-001"
+        name: "메서드 체인 과다 (Train Wreck)"
+        severity: "medium"
+        category: "code-smell"
+        description: "메서드 체인이 4단계를 초과합니다. 디미터 법칙(Law of Demeter) 위반으로 결합도가 높아집니다."
+        enabled: true
+        pattern:
+          type: "ast-filtered-regex"
+          regex: "\\w+\\.\\w+\\([^)]*\\)\\.\\w+\\([^)]*\\)\\.\\w+\\([^)]*\\)\\.\\w+\\("
+        exclude:
+          - ".stream()"
+          - ".builder()"
+          - "StringBuilder"
+          - "StringBuffer"
+          - ".collect("
+          - ".map("
+          - ".filter("
+        custom:
+          rule_id: "CHAIN-001"
+          fix: "중간 변수를 도입하거나, 위임 메서드를 만들어 체인을 줄이세요"
+
+      - id: "quality-instanceof-001"
+        name: "instanceof 연쇄 (다형성 부재)"
+        severity: "medium"
+        category: "code-smell"
+        description: "instanceof 검사가 3회 이상 연속됩니다. 다형성(Polymorphism)이나 Visitor 패턴을 검토하세요."
+        enabled: true
+        pattern:
+          type: "regex-multiline"
+          regex: "instanceof\\s+\\w+[\\s\\S]{0,300}instanceof\\s+\\w+[\\s\\S]{0,300}instanceof\\s+\\w+"
+        custom:
+          rule_id: "INSTANCEOF-001"
+          fix: "다형성(Polymorphism), Visitor 패턴, 또는 Strategy 패턴으로 전환하세요"
+
+      - id: "quality-return-null-001"
+        name: "return null 사용"
+        severity: "low"
+        category: "code-smell"
+        description: "null을 반환하면 호출자에서 NPE 위험이 있습니다. Optional이나 빈 컬렉션을 반환하세요."
+        enabled: true
+        pattern:
+          type: "ast-filtered-regex"
+          regex: "return\\s+null\\s*;"
+        custom:
+          rule_id: "RETURN-NULL-001"
+          fix: "Optional.empty(), Collections.emptyList(), 또는 빈 객체를 반환하세요"
+
+      - id: "quality-mutable-static-001"
+        name: "가변 static 필드"
+        severity: "medium"
+        category: "thread-safety"
+        description: "static 필드가 final이 아니면 멀티스레드 환경에서 데이터 경쟁이 발생합니다."
+        enabled: true
+        pattern:
+          type: "ast-filtered-regex"
+          regex: "(private|protected|public)\\s+static\\s+(?!final)\\w+[<\\[\\w>., ]*\\s+\\w+\\s*[=;]"
+        exclude:
+          - "Logger"
+          - "LoggerFactory"
+          - "log"
+        custom:
+          rule_id: "MUTABLE-STATIC-001"
+          fix: "static final로 변경하거나, AtomicReference/ConcurrentHashMap 등 스레드 안전 타입을 사용하세요"
+
+      - id: "quality-cast-001"
+        name: "Map.get() 타입 캐스팅"
+        severity: "medium"
+        category: "code-smell"
+        description: "Map.get() 결과를 타입 캐스팅하면 런타임 ClassCastException 위험이 있습니다. VO/DTO를 사용하세요."
+        enabled: true
+        pattern:
+          type: "ast-filtered-regex"
+          regex: "\\(\\s*(String|Integer|Long|int|long|double|Double|Float|Boolean|Object)\\s*\\)\\s*\\w+\\.get\\s*\\("
+        custom:
+          rule_id: "CAST-001"
+          fix: "Map<String, Object> 대신 VO/DTO를 사용하거나, 제네릭 Map<String, String>을 사용하세요"
+
+      - id: "quality-setter-chain-001"
+        name: "연속 setter 호출 과다"
+        severity: "low"
+        category: "code-smell"
+        description: "setter 호출이 10줄 이상 연속됩니다. Builder 패턴이나 MapStruct 사용을 고려하세요."
+        enabled: true
+        pattern:
+          type: "regex-multiline"
+          regex: "([ \\t]*\\w+\\.set[A-Z]\\w*\\s*\\([^;]*;\\s*\\n){10,}"
+        custom:
+          rule_id: "SETTER-CHAIN-001"
+          fix: "Builder 패턴, MapStruct, 또는 ModelMapper를 사용하세요"
+
+      - id: "quality-rawtype-001"
+        name: "Raw 타입 사용 (제네릭 누락)"
+        severity: "medium"
+        category: "code-smell"
+        description: "제네릭이 없는 Raw 타입은 타입 안전성을 보장하지 못합니다."
+        enabled: true
+        pattern:
+          type: "ast-filtered-regex"
+          regex: "\\b(List|Map|Set|Collection|ArrayList|HashMap|HashSet|LinkedList)\\s+\\w+\\s*[=;]"
+        custom:
+          rule_id: "RAWTYPE-001"
+          fix: "제네릭을 명시하세요: List<String>, Map<String, Object> 등"
+
+      # ==================== 12. AST 구조 분석 (Phase 2) ====================
+
+      - id: "quality-overload-001"
+        name: "메서드 오버로딩 과다"
+        severity: "medium"
+        category: "design"
+        description: "동일 이름의 메서드가 4개를 초과합니다. 메서드를 분리하거나 파라미터 객체를 사용하세요."
+        enabled: true
+        pattern:
+          type: "ast-class"
+        custom:
+          max_overloads: 4
+          rule_id: "OVERLOAD-001"
+          fix: "메서드를 분리하거나 Builder/파라미터 객체 패턴을 사용하세요"
+
+      - id: "quality-inner-class-001"
+        name: "내부 클래스 과다"
+        severity: "medium"
+        category: "design"
+        description: "내부 클래스가 3개를 초과합니다. 별도 파일로 분리하세요."
+        enabled: true
+        pattern:
+          type: "ast-class"
+        custom:
+          max_inner_classes: 3
+          rule_id: "INNER-CLASS-001"
+          fix: "내부 클래스를 별도 파일로 분리하세요"
+
+      - id: "quality-import-excess-001"
+        name: "과도한 import (클래스 책임 과다 징후)"
+        severity: "low"
+        category: "design"
+        description: "import가 30개를 초과합니다. 클래스가 너무 많은 책임을 가지고 있을 수 있습니다."
+        enabled: true
+        pattern:
+          type: "ast-import"
+        custom:
+          max_imports: 30
+          rule_id: "IMPORT-EXCESS-001"
+          fix: "클래스를 기능별로 분리하여 import 수를 줄이세요"
+
+      # ==================== 13. Dead Code 감지 (Phase 3) ====================
+
+      - id: "quality-dead-method-001"
+        name: "미사용 private 메서드"
+        severity: "medium"
+        category: "dead-code"
+        description: "private 메서드가 같은 파일 내에서 호출되지 않습니다. 불필요한 코드를 제거하세요."
+        enabled: true
+        pattern:
+          type: "ast-dead-code"
+        custom:
+          check_type: "private-method"
+          rule_id: "DEAD-METHOD-001"
+          fix: "사용하지 않는 private 메서드를 삭제하세요"
+
+      - id: "quality-dead-field-001"
+        name: "미사용 private 필드"
+        severity: "medium"
+        category: "dead-code"
+        description: "private 필드가 선언 외에 사용되지 않습니다. 불필요한 코드를 제거하세요."
+        enabled: true
+        pattern:
+          type: "ast-dead-code"
+        custom:
+          check_type: "private-field"
+          rule_id: "DEAD-FIELD-001"
+          fix: "사용하지 않는 private 필드를 삭제하세요"

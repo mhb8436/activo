@@ -1,6 +1,6 @@
 import fs from "fs";
 import path from "path";
-import { ChatMessage, OllamaClient } from "./llm/ollama.js";
+import type { ChatMessage, LLMClient } from "./llm/types.js";
 
 // Conversation storage directory
 const CONVERSATION_DIR = ".activo/conversations";
@@ -110,7 +110,7 @@ export function addMessageToSession(session: SessionData, message: ChatMessage):
 // Summarize old messages using LLM
 async function summarizeMessages(
   messages: ChatMessage[],
-  client: OllamaClient
+  client: LLMClient
 ): Promise<string> {
   if (messages.length === 0) {
     return "";
@@ -157,7 +157,7 @@ ${conversationText}
 
 // Get context for new session (hybrid approach)
 export async function getSessionContext(
-  client: OllamaClient,
+  client: LLMClient,
   recentCount: number = 5
 ): Promise<{ summary: string; recentMessages: ChatMessage[] }> {
   const latestSession = loadLatestSession();

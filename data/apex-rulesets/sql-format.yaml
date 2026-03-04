@@ -1,0 +1,99 @@
+# SQL Format/Style Ruleset
+# SQL 포맷팅 및 코딩 스타일 강제 규칙 (팀별 선택 적용)
+# 사용법: apex ./src --profile=sql-format
+version: "1.0"
+profile: "sql-format"
+
+languages:
+  - language: sql
+    rules:
+      # ==================== SQL 포맷 규칙 (7개) ====================
+
+      - id: "sql-fmt-001"
+        name: "SQL 키워드 대문자"
+        severity: "low"
+        category: "format"
+        description: "SQL 키워드는 모두 대문자로 작성해야 합니다."
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "\\b(select|from|where|and|or|insert|update|delete|join|order|group|having|union|into|values|set)\\b"
+        custom:
+          rule_id: "SQL-FMT-001"
+
+      - id: "sql-fmt-002"
+        name: "라인 길이 80자 초과"
+        severity: "low"
+        category: "format"
+        description: "한 라인 80자 초과는 가독성을 저해합니다."
+        enabled: true
+        pattern:
+          type: "line-length"
+          max_length: 80
+        custom:
+          rule_id: "SQL-FMT-002"
+
+      - id: "sql-fmt-003"
+        name: "SQL 내 공백 라인"
+        severity: "low"
+        category: "format"
+        description: "SQL 중간에 빈 라인이 있으면 안됩니다."
+        enabled: true
+        pattern:
+          type: "method-analysis"
+          conditions:
+            - "sql-contains-blank-line"
+        custom:
+          rule_id: "SQL-FMT-003"
+
+      - id: "sql-sel-004"
+        name: "다중 컬럼 한 라인"
+        severity: "low"
+        category: "select"
+        description: "한 라인에 하나의 컬럼만 기술하세요."
+        enabled: true
+        pattern:
+          type: "method-analysis"
+          conditions:
+            - "multiple-columns-one-line"
+        custom:
+          rule_id: "SQL-SEL-004"
+
+      - id: "sql-from-005"
+        name: "다중 테이블 한 라인"
+        severity: "low"
+        category: "from"
+        description: "한 라인에 하나의 테이블만 기술하세요."
+        enabled: true
+        pattern:
+          type: "method-analysis"
+          conditions:
+            - "multiple-tables-one-line"
+        custom:
+          rule_id: "SQL-FROM-005"
+
+      - id: "sql-where-007"
+        name: "다중 조건 한 라인"
+        severity: "low"
+        category: "where"
+        description: "한 라인에 하나의 조건만 기술하세요."
+        enabled: true
+        pattern:
+          type: "method-analysis"
+          conditions:
+            - "multiple-conditions-one-line"
+        custom:
+          rule_id: "SQL-WHERE-007"
+
+      - id: "sql-sel-006"
+        name: "컬럼 주석 형식"
+        severity: "low"
+        category: "select"
+        description: "컬럼 주석은 /* */ 형식을 사용하세요."
+        enabled: true
+        pattern:
+          type: "method-analysis"
+          conditions:
+            - "column-comment-not-block-style"
+        custom:
+          rule_id: "SQL-SEL-006"

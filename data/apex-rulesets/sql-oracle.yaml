@@ -1,0 +1,281 @@
+# Oracle Database Specific Ruleset
+# Oracle 전용 함수, 구문, 힌트 관련 규칙
+# 사용법: apex ./src --profile=sql-oracle
+version: "1.0"
+profile: "sql-oracle"
+
+languages:
+  - language: sql
+    rules:
+      # ==================== Oracle 힌트 규칙 (4개) ====================
+
+      - id: "sql-cmt-002"
+        name: "한줄 힌트 사용"
+        severity: "high"
+        category: "comment"
+        description: "--+ 힌트 대신 /*+ */ 힌트를 사용하세요. (Oracle 전용)"
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "--\\+"
+        custom:
+          rule_id: "SQL-CMT-002"
+
+      - id: "sql-hint-001"
+        name: "힌트 무단 사용"
+        severity: "high"
+        category: "hint"
+        description: "힌트 사용은 DBA 협의가 필요합니다. (Oracle 전용)"
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "/\\*\\+[^*]*\\*/"
+        custom:
+          rule_id: "SQL-HINT-001"
+          note: "DBA 협의 필수"
+
+      - id: "sql-hint-002"
+        name: "LEADING 외 힌트"
+        severity: "high"
+        category: "hint"
+        description: "온라인 SQL에서는 LEADING 힌트만 사용 가능합니다. (Oracle 전용)"
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "/\\*\\+\\s*(?!LEADING)[A-Z_]+\\s*\\("
+        custom:
+          rule_id: "SQL-HINT-002"
+
+      - id: "sql-ast-hint-001"
+        name: "AST 힌트 무단 사용"
+        severity: "high"
+        category: "hint"
+        description: "AST 기반: 힌트 사용은 DBA 협의가 필요합니다. (Oracle 전용)"
+        enabled: true
+        pattern:
+          type: "ast-sql-hint"
+          conditions:
+            - "hint-exists"
+        custom:
+          rule_id: "SQL-AST-HINT-001"
+
+      - id: "sql-ast-hint-002"
+        name: "AST LEADING 외 힌트"
+        severity: "high"
+        category: "hint"
+        description: "AST 기반: 온라인 SQL에서는 LEADING 힌트만 사용 가능합니다. (Oracle 전용)"
+        enabled: true
+        pattern:
+          type: "ast-sql-hint"
+          conditions:
+            - "non-leading-hint"
+        custom:
+          rule_id: "SQL-AST-HINT-002"
+
+      # ==================== Oracle 전용 함수 규칙 (5개) ====================
+
+      - id: "sql-func-001"
+        name: "DECODE 사용"
+        severity: "high"
+        category: "function"
+        description: "DECODE 대신 CASE 문을 사용하세요. (Oracle 전용)"
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "\\bDECODE\\s*\\("
+          flags: "i"
+        custom:
+          rule_id: "SQL-FUNC-001"
+
+      - id: "sql-func-002"
+        name: "SUM 내 NVL"
+        severity: "low"
+        category: "function"
+        description: "SUM(NVL(COL, 0))는 불필요합니다. SUM(COL)로 충분합니다. (Oracle 전용)"
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "\\bSUM\\s*\\(\\s*NVL\\s*\\("
+          flags: "i"
+        custom:
+          rule_id: "SQL-FUNC-002"
+
+      - id: "sql-func-003"
+        name: "날짜 컬럼 TO_CHAR 가공"
+        severity: "critical"
+        category: "function"
+        description: "날짜 컬럼을 TO_CHAR로 가공하면 인덱스를 사용할 수 없습니다. (Oracle 전용)"
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "\\bWHERE[^;]*TO_CHAR\\s*\\([^,]+_DT|_DATE"
+          flags: "i"
+        custom:
+          rule_id: "SQL-FUNC-003"
+
+      - id: "sql-smell-003"
+        name: "WHERE 절 NVL/COALESCE 컬럼 감싸기"
+        severity: "high"
+        category: "performance"
+        description: "WHERE 절에서 NVL/COALESCE로 컬럼을 감싸면 인덱스를 사용할 수 없습니다. (Oracle 전용)"
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "\\bWHERE[^;]*(?:NVL|COALESCE)\\s*\\(\\s*\\w+\\.\\w+"
+          flags: "i"
+        custom:
+          rule_id: "SQL-SMELL-003"
+          fix: "IS NULL 조건과 OR를 사용하거나 NVL 대신 비교 대상 값을 변환하세요"
+
+      - id: "sql-smell-014"
+        name: "ORDER BY DBMS_RANDOM"
+        severity: "high"
+        category: "performance"
+        description: "ORDER BY DBMS_RANDOM은 전체 테이블 스캔+정렬을 유발합니다. SAMPLE을 사용하세요. (Oracle 전용)"
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "\\bORDER\\s+BY\\s+.*DBMS_RANDOM"
+          flags: "i"
+        custom:
+          rule_id: "SQL-SMELL-014"
+          fix: "SAMPLE 절 또는 ROWNUM 기반 랜덤 추출을 사용하세요"
+
+      # ==================== Oracle 전용 구문 규칙 (6개) ====================
+
+      - id: "sql-where-001"
+        name: "인덱스 컬럼 TO_CHAR 가공"
+        severity: "critical"
+        category: "where"
+        description: "인덱스 컬럼을 TO_CHAR로 가공하면 인덱스를 사용할 수 없습니다. (Oracle 전용)"
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "\\bWHERE[^;]*TO_CHAR\\s*\\(\\s*\\w+\\.\\w+|\\bWHERE[^;]*\\w+\\.\\w+\\s*[\\*\\/\\+\\-]\\s*\\d+"
+          flags: "i"
+        custom:
+          rule_id: "SQL-WHERE-001"
+
+      - id: "sql-page-001"
+        name: "ROWNUM 페이징 인라인뷰 누락"
+        severity: "high"
+        category: "paging"
+        description: "ROWNUM 사용 시 인라인뷰로 감싸야 합니다. (Oracle 전용)"
+        enabled: true
+        pattern:
+          type: "method-analysis"
+          conditions:
+            - "rownum-without-inline-view"
+        custom:
+          rule_id: "SQL-PAGE-001"
+
+      - id: "sql-dyn-001"
+        name: "Dynamic SQL (EXECUTE IMMEDIATE)"
+        severity: "high"
+        category: "restriction"
+        description: "Dynamic SQL(EXECUTE IMMEDIATE) 사용은 DBA 협의가 필요합니다. (Oracle 전용)"
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "\\bEXECUTE\\s+IMMEDIATE\\b"
+          flags: "i"
+        custom:
+          rule_id: "SQL-DYN-001"
+
+      - id: "sql-lock-002"
+        name: "FOR UPDATE WAIT"
+        severity: "high"
+        category: "lock"
+        description: "FOR UPDATE WAIT 대신 NOWAIT를 사용하세요. (Oracle 전용)"
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "\\bFOR\\s+UPDATE\\s+WAIT\\b"
+          flags: "i"
+        custom:
+          rule_id: "SQL-LOCK-002"
+
+      - id: "sql-smell-015"
+        name: "WHERE절 INSTR 사용"
+        severity: "high"
+        category: "performance"
+        description: "WHERE절에서 INSTR 함수 사용은 인덱스를 무효화합니다. (Oracle 전용)"
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "\\bWHERE[^;]*INSTR\\s*\\("
+          flags: "i"
+        custom:
+          rule_id: "SQL-SMELL-015"
+          fix: "LIKE 조건 또는 함수 기반 인덱스를 고려하세요"
+
+      - id: "sql-smell-016"
+        name: "단순 패턴에 REGEXP_LIKE"
+        severity: "low"
+        category: "performance"
+        description: "단순 패턴 매칭에 REGEXP_LIKE는 과도합니다. LIKE가 더 효율적입니다. (Oracle 전용)"
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "\\bREGEXP_LIKE\\s*\\("
+          flags: "i"
+        custom:
+          rule_id: "SQL-SMELL-016"
+          fix: "단순 패턴이라면 LIKE로 변경하세요"
+
+      # ==================== Oracle 전용 JOIN ON절 함수 (NVL 포함) ====================
+
+      - id: "sql-smell-022"
+        name: "JOIN ON절 함수 사용 (NVL 포함)"
+        severity: "high"
+        category: "performance"
+        description: "JOIN ON 조건에서 함수 사용 시 인덱스가 무효화됩니다. (Oracle 전용)"
+        enabled: true
+        pattern:
+          type: "regex-multiline"
+          regex: "\\bON\\s+[\\s\\S]*?(?:UPPER|LOWER|TRIM|TO_CHAR|NVL|COALESCE|SUBSTR)\\s*\\("
+          flags: "i"
+        custom:
+          rule_id: "SQL-SMELL-022"
+          fix: "JOIN 조건에서 함수를 제거하고 데이터 정합성을 확보하세요"
+
+      - id: "sql-oracle-020"
+        name: "Oracle (+) 구문 외부조인 사용"
+        severity: "low"
+        category: "portability"
+        description: "Oracle 전용 (+) 외부조인 구문은 ANSI LEFT/RIGHT JOIN으로 대체하세요. 이식성과 가독성이 향상됩니다."
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "\\w+\\s*\\(\\+\\)"
+        custom:
+          rule_id: "SQL-ORACLE-020"
+          fix: "LEFT JOIN 또는 RIGHT JOIN ANSI 구문으로 변경하세요"
+
+  - language: xml
+    rules:
+      - id: "sql-mybatis-004"
+        name: "MyBatis ANSI JOIN 금지"
+        severity: "high"
+        category: "join"
+        description: "MyBatis SQL에서 ANSI JOIN은 Oracle 환경에서 comma-join 사용을 권장합니다. (Oracle 전용)"
+        enabled: false
+        pattern:
+          type: "regex"
+          regex: "\\b(INNER\\s+JOIN|LEFT\\s+(OUTER\\s+)?JOIN|RIGHT\\s+(OUTER\\s+)?JOIN)\\b"
+          flags: "i"
+        custom:
+          rule_id: "SQL-MYBATIS-004"
+
+      - id: "sql-mybatis-007"
+        name: "MyBatis DECODE 사용"
+        severity: "high"
+        category: "function"
+        description: "MyBatis SQL에서 DECODE 대신 CASE를 사용하세요. (Oracle 전용)"
+        enabled: false  # sql-func-001과 동일 regex 중복
+        pattern:
+          type: "regex"
+          regex: "\\bDECODE\\s*\\("
+          flags: "i"
+        custom:
+          rule_id: "SQL-MYBATIS-007"

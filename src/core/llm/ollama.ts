@@ -1,19 +1,9 @@
 import { OllamaConfig } from "../config.js";
 import type { Tool, ToolCall } from "../tools/types.js";
+import type { ChatMessage, StreamEvent, LLMClient } from "./types.js";
 
-export interface ChatMessage {
-  role: "system" | "user" | "assistant" | "tool";
-  content: string;
-  toolCalls?: ToolCall[];
-  toolCallId?: string;
-}
-
-export interface StreamEvent {
-  type: "content" | "tool_call" | "done" | "error";
-  content?: string;
-  toolCall?: ToolCall;
-  error?: string;
-}
+// Re-export types from types.ts for backward compatibility
+export type { ChatMessage, StreamEvent, LLMClient } from "./types.js";
 
 interface OllamaChatResponse {
   model: string;
@@ -89,7 +79,7 @@ function pruneMessages(
   return [systemMsg, ...kept, lastMsg];
 }
 
-export class OllamaClient {
+export class OllamaClient implements LLMClient {
   private baseUrl: string;
   private model: string;
   private contextLength: number;
@@ -317,6 +307,10 @@ export class OllamaClient {
 
   setModel(model: string): void {
     this.model = model;
+  }
+
+  getProvider(): "ollama" | "anthropic" {
+    return "ollama";
   }
 
   // Generate embeddings for text

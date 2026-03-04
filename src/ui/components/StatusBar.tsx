@@ -7,7 +7,7 @@ interface StatusBarProps {
   messageCount: number;
 }
 
-export function StatusBar({
+export const StatusBar = React.memo(function StatusBar({
   model,
   isProcessing,
   messageCount,
@@ -33,4 +33,4 @@ export function StatusBar({
       </Box>
     </Box>
   );
-}
+});

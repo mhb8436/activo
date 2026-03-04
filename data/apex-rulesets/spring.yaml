@@ -1,0 +1,455 @@
+# Spring Development Standards Ruleset
+# Spring / Spring Boot 개발 표준 규칙
+# - DI 패턴 (생성자 주입 권장)
+# - @Transactional 올바른 사용
+# - Controller 계층 규칙
+# - REST API 패턴
+# - Bean 설정 패턴
+# - 예외 처리 표준
+# - 테스트 패턴
+version: "1.0"
+profile: "spring"
+
+languages:
+  - language: java
+    rules:
+      # ==================== 1. DI 패턴 ====================
+
+      - id: "spring-di-001"
+        name: "@Autowired 필드 주입"
+        severity: "medium"
+        category: "dependency-injection"
+        description: "@Autowired 필드 주입은 테스트가 어렵고 순환 의존성을 숨깁니다. 생성자 주입을 사용하세요."
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "@Autowired\\s*$"
+        custom:
+          rule_id: "SPRING-DI-001"
+          fix: "생성자 주입(Constructor Injection)을 사용하세요. @RequiredArgsConstructor(Lombok)도 권장합니다."
+          example: "private final UserService userService; // 생성자에서 주입"
+
+      - id: "spring-di-002"
+        name: "@Inject 사용 (@Autowired 권장)"
+        severity: "low"
+        category: "dependency-injection"
+        description: "Spring 프로젝트에서는 @Inject보다 @Autowired 또는 생성자 주입이 일관성 있습니다."
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "@Inject\\s*$"
+        custom:
+          rule_id: "SPRING-DI-002"
+          fix: "생성자 주입 또는 @Autowired를 사용하세요"
+
+      - id: "spring-di-003"
+        name: "@Resource 필드 주입"
+        severity: "medium"
+        category: "dependency-injection"
+        description: "@Resource 필드 주입은 JSR-250 방식으로, Spring에서는 생성자 주입을 권장합니다."
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "@Resource\\s*$"
+        custom:
+          rule_id: "SPRING-DI-003"
+          fix: "생성자 주입(Constructor Injection)을 사용하세요"
+
+      # ==================== 2. @Transactional 관련 ====================
+
+      - id: "spring-tx-001"
+        name: "@Transactional 없는 Service public 메서드"
+        severity: "low"
+        category: "transaction"
+        description: "Service 클래스의 public 메서드에 @Transactional이 없으면 트랜잭션 관리가 되지 않을 수 있습니다."
+        enabled: false
+        pattern:
+          type: "regex"
+          regex: "(?<!@Transactional\\n\\s*)public\\s+(?!class\\b)\\w+\\s+\\w+\\s*\\("
+        custom:
+          rule_id: "SPRING-TX-001"
+          fix: "Service 메서드에 @Transactional 또는 @Transactional(readOnly=true)를 추가하세요"
+
+      - id: "spring-tx-002"
+        name: "private 메서드에 @Transactional"
+        severity: "high"
+        category: "transaction"
+        description: "private 메서드의 @Transactional은 프록시 기반 AOP에서 동작하지 않습니다."
+        enabled: true
+        pattern:
+          type: "regex-multiline"
+          regex: "@Transactional[^}]*?\\n\\s*private\\s+"
+        custom:
+          rule_id: "SPRING-TX-002"
+          fix: "public 메서드로 변경하거나, 별도 Bean으로 분리하세요"
+
+      - id: "spring-tx-003"
+        name: "@Transactional 내 try-catch로 예외 삼킴"
+        severity: "high"
+        category: "transaction"
+        description: "@Transactional 메서드에서 catch로 예외를 삼키면 롤백이 발생하지 않습니다."
+        enabled: true
+        pattern:
+          type: "regex-multiline"
+          regex: "@Transactional[\\s\\S]*?catch\\s*\\([^)]*\\)\\s*\\{[^}]*\\}"
+        custom:
+          rule_id: "SPRING-TX-003"
+          fix: "catch 블록에서 예외를 재throw하거나, @Transactional(noRollbackFor=...)를 명시하세요"
+
+      - id: "spring-tx-004"
+        name: "@Transactional 메서드 내 외부 API 호출"
+        severity: "high"
+        category: "transaction"
+        description: "@Transactional 메서드에서 외부 API를 호출하면 긴 트랜잭션/데드락/타임아웃 위험이 있습니다."
+        enabled: true
+        pattern:
+          type: "ast-method-call"
+          method: "exchange|execute|getForObject|getForEntity|postForObject|postForEntity|put|delete|patchForObject|send|retrieve|block|call|newCall"
+          qualifier: ".*[Rr]est[Tt]emplate|.*[Ww]eb[Cc]lient|.*[Hh]ttp[Cc]lient|.*[Oo]k[Hh]ttp.*|.*[Ff]eign.*"
+          context: "has-method-annotation:Transactional"
+        custom:
+          rule_id: "SPRING-TX-004"
+          fix: "외부 API 호출을 트랜잭션 밖으로 분리하거나 @Transactional(propagation=NOT_SUPPORTED)를 사용하세요"
+
+      - id: "spring-tx-005"
+        name: "@Transactional 누락 (다건 CUD)"
+        severity: "high"
+        category: "transaction"
+        description: "2개 이상의 CUD 작업을 호출하지만 @Transactional이 없어 데이터 정합성이 보장되지 않습니다."
+        enabled: true
+        pattern:
+          type: "ast-multi-cud"
+          method: "insert|update|delete|save|remove|create|modify"
+          qualifier: ".*Dao|.*Repository|.*Mapper|.*Service"
+        custom:
+          min_cud_calls: 2
+          rule_id: "SPRING-TX-005"
+          fix: "@Transactional을 추가하거나, 트랜잭션이 있는 메서드로 위임하세요"
+
+      # ==================== 3. Controller 계층 규칙 ====================
+
+      - id: "spring-ctrl-001"
+        name: "Controller에서 Repository/Mapper 직접 주입"
+        severity: "high"
+        category: "architecture"
+        description: "Controller에서 Repository/Mapper를 직접 사용하면 계층 구조(Controller→Service→Repository)를 위반합니다."
+        enabled: true
+        pattern:
+          type: "regex-multiline"
+          regex: "@(Controller|RestController)[\\s\\S]*?(Repository|Mapper|DAO)\\s+\\w+\\s*;"
+        custom:
+          rule_id: "SPRING-CTRL-001"
+          fix: "Service 레이어를 통해 데이터 접근하세요"
+
+      - id: "spring-ctrl-002"
+        name: "Controller에서 직접 SQL/JDBC 사용"
+        severity: "critical"
+        category: "architecture"
+        description: "Controller에서 직접 SQL이나 JdbcTemplate을 사용하면 계층 아키텍처를 심각하게 위반합니다."
+        enabled: true
+        pattern:
+          type: "regex-multiline"
+          regex: "@(Controller|RestController)[\\s\\S]*?(JdbcTemplate|DataSource|SqlSession)\\s+\\w+"
+        custom:
+          rule_id: "SPRING-CTRL-002"
+          fix: "데이터 접근 로직을 Service/Repository 레이어로 이동하세요"
+
+      - id: "spring-ctrl-003"
+        name: "Controller 메서드에서 HttpServletRequest/Response 직접 사용"
+        severity: "medium"
+        category: "design"
+        description: "Controller에서 HttpServletRequest/Response를 직접 사용하면 테스트가 어렵습니다. Spring MVC 추상화를 사용하세요."
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "\\b(HttpServletRequest|HttpServletResponse)\\s+\\w+\\s*[,)]"
+        custom:
+          rule_id: "SPRING-CTRL-003"
+          fix: "@RequestParam, @RequestBody, @PathVariable, ResponseEntity 등 Spring 추상화를 사용하세요"
+
+      - id: "spring-ctrl-004"
+        name: "Controller에서 HttpSession 직접 사용"
+        severity: "medium"
+        category: "design"
+        description: "Controller에서 HttpSession을 직접 사용하면 스케일아웃이 어렵습니다. Spring Session이나 @SessionAttributes를 사용하세요."
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "\\bHttpSession\\s+\\w+\\s*[,)]"
+        custom:
+          rule_id: "SPRING-CTRL-004"
+          fix: "@SessionAttributes, Spring Session, 또는 SecurityContextHolder를 사용하세요"
+
+      - id: "spring-ctrl-005"
+        name: "Controller에서 비즈니스 로직 수행"
+        severity: "medium"
+        category: "architecture"
+        description: "Controller에서 조건 분기나 데이터 가공 등 비즈니스 로직이 포함되어 있습니다."
+        enabled: true
+        pattern:
+          type: "ast-class"
+          name_pattern: ".*Controller$"
+        custom:
+          max_methods: 15
+          rule_id: "SPRING-CTRL-005"
+          fix: "비즈니스 로직을 Service 레이어로 이동하세요"
+
+      # ==================== 4. REST API 패턴 ====================
+
+      - id: "spring-rest-001"
+        name: "@Controller + @ResponseBody 대신 @RestController 사용"
+        severity: "low"
+        category: "rest-api"
+        description: "@Controller와 @ResponseBody를 같이 쓰는 대신 @RestController를 사용하세요."
+        enabled: true
+        pattern:
+          type: "regex-multiline"
+          regex: "@Controller[\\s\\S]{0,200}@ResponseBody"
+        custom:
+          rule_id: "SPRING-REST-001"
+          fix: "클래스 레벨에 @RestController를 사용하세요"
+
+      - id: "spring-rest-002"
+        name: "REST API에서 void 반환"
+        severity: "medium"
+        category: "rest-api"
+        description: "REST API 메서드가 void를 반환하면 응답 상태와 본문을 제어할 수 없습니다. ResponseEntity를 사용하세요."
+        enabled: true
+        pattern:
+          type: "regex-multiline"
+          regex: "@(GetMapping|PostMapping|PutMapping|DeleteMapping|PatchMapping).*\\n\\s*public\\s+void\\s+"
+        custom:
+          rule_id: "SPRING-REST-002"
+          fix: "ResponseEntity<T>를 반환 타입으로 사용하세요"
+
+      - id: "spring-rest-003"
+        name: "PrintWriter로 직접 응답 출력"
+        severity: "high"
+        category: "rest-api"
+        description: "PrintWriter로 직접 응답을 출력하면 인코딩 문제와 XSS 취약점이 발생할 수 있습니다."
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "response\\.getWriter\\s*\\(\\s*\\)\\.print"
+        custom:
+          rule_id: "SPRING-REST-003"
+          fix: "ResponseEntity 또는 @ResponseBody를 사용하세요. JSON은 Jackson이 자동 처리합니다."
+
+      - id: "spring-rest-004"
+        name: "Map<String, Object> 응답 반환"
+        severity: "medium"
+        category: "rest-api"
+        description: "REST API에서 Map<String, Object>를 반환하면 API 문서화가 불가능하고 클라이언트 개발이 어렵습니다."
+        enabled: true
+        pattern:
+          type: "regex-multiline"
+          regex: "@(GetMapping|PostMapping|PutMapping|DeleteMapping|RequestMapping)[^{]*\\n[^{]*Map<String,\\s*Object>"
+        custom:
+          rule_id: "SPRING-REST-004"
+          fix: "전용 Response DTO 클래스를 정의하여 반환하세요"
+
+      # ==================== 5. Bean 설정/스코프 ====================
+
+      - id: "spring-bean-001"
+        name: "Controller 멤버 변수 (상태 보유)"
+        severity: "critical"
+        category: "thread-safety"
+        description: "Controller는 싱글톤 스코프이므로 인스턴스 변수에 요청별 데이터를 저장하면 스레드 안전성 문제가 발생합니다."
+        enabled: true
+        pattern:
+          type: "regex-multiline"
+          regex: "@(Controller|RestController)[\\s\\S]*?\\bprivate\\s+(?!(?:static\\s+final|final\\s+static)\\b)(?!.*Service\\b)(?!.*Mapper\\b)(?!.*Repository\\b)(?!.*Logger\\b)(String|int|long|boolean|Integer|Long|Boolean|List|Map|Set)\\s+\\w+\\s*[;=]"
+        custom:
+          rule_id: "SPRING-BEAN-001"
+          fix: "요청별 데이터는 메서드 지역변수나 RequestScope Bean으로 관리하세요"
+
+      - id: "spring-bean-002"
+        name: "prototype 빈을 singleton에 주입"
+        severity: "high"
+        category: "thread-safety"
+        description: "@Scope(\"prototype\") 빈을 싱글톤 빈에 주입하면 프로토타입 효과가 없습니다."
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "@Scope\\s*\\(\\s*\"prototype\"\\s*\\)"
+        custom:
+          rule_id: "SPRING-BEAN-002"
+          fix: "ObjectFactory<T> 또는 Provider<T>를 통해 매번 새 인스턴스를 생성하세요"
+
+      # ==================== 6. 예외 처리 ====================
+
+      - id: "spring-ex-001"
+        name: "Controller에서 직접 try-catch"
+        severity: "medium"
+        category: "exception"
+        description: "Controller에서 직접 try-catch하는 대신 @ExceptionHandler 또는 @ControllerAdvice를 사용하세요."
+        enabled: true
+        pattern:
+          type: "regex-multiline"
+          regex: "@(GetMapping|PostMapping|PutMapping|DeleteMapping|RequestMapping)[\\s\\S]{0,500}?try\\s*\\{"
+        custom:
+          rule_id: "SPRING-EX-001"
+          fix: "@ControllerAdvice + @ExceptionHandler로 전역 예외 처리하세요"
+
+      - id: "spring-ex-002"
+        name: "RuntimeException 직접 throw"
+        severity: "medium"
+        category: "exception"
+        description: "범용 RuntimeException 대신 비즈니스 예외 클래스를 정의하여 사용하세요."
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "throw\\s+new\\s+RuntimeException\\s*\\("
+        custom:
+          rule_id: "SPRING-EX-002"
+          fix: "BusinessException, CustomException 등 도메인 예외 클래스를 정의하세요"
+
+      - id: "spring-ex-003"
+        name: "catch(Exception e) 광범위 예외"
+        severity: "medium"
+        category: "exception"
+        description: "최상위 Exception을 catch하면 의도치 않은 예외까지 처리됩니다. 구체적인 예외 타입을 사용하세요."
+        enabled: false  # secure-err-005와 동일 regex 중복
+        pattern:
+          type: "regex"
+          regex: "catch\\s*\\(\\s*Exception\\s+\\w+\\s*\\)"
+        custom:
+          rule_id: "SPRING-EX-003"
+          fix: "구체적인 예외 타입(IOException, SQLException 등)을 catch하세요"
+
+      # ==================== 7. 테스트 패턴 ====================
+
+      - id: "spring-test-001"
+        name: "@SpringBootTest 불필요 사용"
+        severity: "low"
+        category: "testing"
+        description: "단위 테스트에 @SpringBootTest를 사용하면 전체 컨텍스트가 로드되어 느립니다."
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "@SpringBootTest"
+        custom:
+          rule_id: "SPRING-TEST-001"
+          fix: "단위 테스트: @ExtendWith(MockitoExtension.class), 슬라이스 테스트: @WebMvcTest, @DataJpaTest 사용"
+
+      - id: "spring-test-002"
+        name: "Thread.sleep() 테스트"
+        severity: "medium"
+        category: "testing"
+        description: "테스트에서 Thread.sleep()을 사용하면 불안정하고 느립니다. Awaitility 등을 사용하세요."
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "Thread\\.sleep\\s*\\("
+        custom:
+          rule_id: "SPRING-TEST-002"
+          fix: "Awaitility.await() 또는 CountDownLatch를 사용하세요"
+
+      - id: "spring-test-003"
+        name: "@Transactional 테스트 주의"
+        severity: "low"
+        category: "testing"
+        description: "테스트 클래스의 @Transactional은 테스트 후 자동 롤백되어, 실제 커밋 동작을 검증하지 못할 수 있습니다."
+        enabled: false
+        pattern:
+          type: "regex-multiline"
+          regex: "@Transactional[\\s\\S]*?@Test"
+        custom:
+          rule_id: "SPRING-TEST-003"
+          fix: "통합 테스트에서는 @Transactional 사용을 재고하세요. 데이터 정리는 @AfterEach로 처리하세요."
+
+      # ==================== 8. 보안/인증 ====================
+
+      - id: "spring-sec-001"
+        name: "CORS 전체 허용"
+        severity: "high"
+        category: "security"
+        description: "@CrossOrigin(\"*\")은 모든 도메인에서 접근을 허용하여 보안에 취약합니다."
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "@CrossOrigin\\s*\\(\\s*[\"']\\*[\"']\\s*\\)"
+        custom:
+          rule_id: "SPRING-SEC-001"
+          fix: "허용할 도메인을 명시적으로 지정하세요: @CrossOrigin(origins = \"https://example.com\")"
+
+      - id: "spring-sec-002"
+        name: "CSRF 비활성화"
+        severity: "high"
+        category: "security"
+        description: "CSRF 보호를 비활성화하면 CSRF 공격에 취약합니다. REST API가 아닌 경우 활성화하세요."
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "\\.csrf\\s*\\(\\s*\\)\\s*\\.disable\\s*\\("
+        custom:
+          rule_id: "SPRING-SEC-002"
+          fix: "REST API(토큰 인증)가 아닌 경우 CSRF 보호를 유지하세요"
+
+  # ==================== XML: Spring Security 설정 감사 ====================
+  - language: xml
+    rules:
+      - id: "spring-sec-cfg-001"
+        name: "Spring Security: ROLE 분리 없이 isAuthenticated() 단일 정책"
+        severity: "medium"
+        category: "security-config"
+        description: "모든 URL에 isAuthenticated()만 적용하고 hasRole()/hasAuthority()로 권한을 분리하지 않으면, 로그인한 사용자 누구나 관리자 기능에 접근할 수 있습니다."
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "intercept-url\\s+pattern=\"/\\*\\*\"\\s+access=\"isAuthenticated\\(\\)\""
+        custom:
+          rule_id: "SPRING-SEC-CFG-001"
+          fix: "관리자(/admin/**), 일반 사용자(/user/**) 등 URL 패턴별로 hasRole() 또는 hasAuthority()를 분리하세요."
+
+      - id: "spring-sec-cfg-002"
+        name: "Spring Security: XML에서 CSRF 비활성화"
+        severity: "high"
+        category: "security-config"
+        description: "Spring Security XML 설정에서 CSRF 보호가 비활성화되어 있습니다. 세션 기반 인증(JSP)에서는 CSRF 토큰이 필수입니다."
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "<csrf\\s+disabled=\"true\"\\s*/>"
+        custom:
+          rule_id: "SPRING-SEC-CFG-002"
+          fix: "CSRF 보호를 활성화하세요. JSP에서는 <input type='hidden' name='${_csrf.parameterName}' value='${_csrf.token}'/> 추가 필요."
+
+      - id: "spring-sec-cfg-003"
+        name: "Spring Security: security=\"none\" 광범위 패턴"
+        severity: "medium"
+        category: "security-config"
+        description: "security=\"none\"이 광범위한 URL 패턴(/**, /api/**, /edu/** 등)에 적용되어 해당 경로의 모든 요청이 인증 없이 접근 가능합니다."
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "<http\\s+pattern=\"[^\"]*\\*\\*[^\"]*\"\\s+security=\"none\""
+        custom:
+          rule_id: "SPRING-SEC-CFG-003"
+          fix: "security=\"none\"은 정적 리소스(/css/**, /js/**, /images/**)에만 사용하고, 비즈니스 URL에는 permitAll()을 사용하세요."
+
+      - id: "spring-sec-cfg-004"
+        name: "Spring Security: 단일 intercept-url로 전체 URL 커버"
+        severity: "low"
+        category: "security-config"
+        description: "intercept-url이 pattern=\"/**\" 하나만 있어, URL별 세분화된 접근 제어가 없습니다. spring-sec-cfg-001과 함께 확인하세요."
+        enabled: false
+        pattern:
+          type: "regex"
+          regex: "intercept-url\\s+pattern=\"/\\*\\*\""
+        custom:
+          rule_id: "SPRING-SEC-CFG-004"
+          fix: "URL 패턴별로 intercept-url을 분리하여 세분화된 접근 제어를 적용하세요."
+
+      - id: "spring-sec-cfg-005"
+        name: "Spring Security 4.x 이하 (EOL) 사용"
+        severity: "high"
+        category: "security-config"
+        description: "Spring Security 4.x 이하 스키마를 사용하고 있습니다. Spring Security 4.x는 EOL(End of Life)로 보안 패치를 받지 못합니다."
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "spring-security-[1-4]\\.[0-9]+\\.xsd"
+        custom:
+          rule_id: "SPRING-SEC-CFG-005"
+          fix: "Spring Security 5.x 이상으로 업그레이드하세요. eGovFrame 4.x는 Spring Security 5.x를 지원합니다."

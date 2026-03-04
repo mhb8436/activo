@@ -15,6 +15,13 @@ import { dependencyTools } from "./dependencyAnalysis.js";
 import { openapiTools } from "./openapiAnalysis.js";
 import { pythonTools } from "./pythonAnalysis.js";
 import { analyzeAllTools } from "./analyzeAll.js";
+import { ruleGenTools } from "./ruleGen.js";
+import { explainIssueTools } from "./explainIssue.js";
+import { analyzePatternsTools } from "./analyzePatterns.js";
+import { generateReportTools } from "./generateReport.js";
+import { recommendProfileTools } from "./recommendProfile.js";
+import { getMCPManager } from "../mcp/client.js";
+import { INTENT_PATTERNS } from "../intentRouter.js";
 
 export * from "./types.js";
 export * from "./builtIn.js";
@@ -33,10 +40,18 @@ export * from "./dependencyAnalysis.js";
 export * from "./openapiAnalysis.js";
 export * from "./pythonAnalysis.js";
 export * from "./analyzeAll.js";
+export * from "./ruleGen.js";
+export * from "./apexPaths.js";
+export * from "./explainIssue.js";
+export * from "./analyzePatterns.js";
+export * from "./generateReport.js";
+export * from "./recommendProfile.js";
 
-// All available tools
+// All available tools (local + MCP)
 export function getAllTools(): Tool[] {
-  return [...builtInTools, ...standardsTools, ...cacheTools, ...astTools, ...embeddingTools, ...memoryTools, ...javaTools, ...frontendTools, ...sqlTools, ...mybatisTools, ...cssTools, ...htmlTools, ...dependencyTools, ...openapiTools, ...pythonTools, ...analyzeAllTools];
+  const localTools = [...builtInTools, ...standardsTools, ...cacheTools, ...astTools, ...embeddingTools, ...memoryTools, ...javaTools, ...frontendTools, ...sqlTools, ...mybatisTools, ...cssTools, ...htmlTools, ...dependencyTools, ...openapiTools, ...pythonTools, ...analyzeAllTools, ...ruleGenTools, ...explainIssueTools, ...analyzePatternsTools, ...generateReportTools, ...recommendProfileTools];
+  const mcpTools = getMCPManager().getAllTools();
+  return [...localTools, ...mcpTools];
 }
 
 // Get tool by name
@@ -100,28 +115,54 @@ const TOOL_CATEGORIES: Record<string, string[]> = {
   embeddings: ["index_codebase", "semantic_search", "find_similar_code", "embeddings_status", "clear_embeddings"],
   memory: ["init_project_memory", "add_key_file", "add_note", "add_fact", "save_conversation", "get_project_context", "search_memory", "clear_memory"],
   file_write: ["write_file", "run_command"],
+  apex: ["mcp_apex_analyze_code", "mcp_apex_list_profiles", "mcp_apex_get_issues", "explain_issue", "analyze_patterns", "generate_report", "recommend_profile"],
+  ruleGen: ["generate_apex_rules"],
 };
 
-// Keyword-to-category mapping
-const KEYWORD_CATEGORIES: Array<{ keywords: string[]; categories: string[] }> = [
-  { keywords: ["java", "spring", ".java", "controller", "service", "repository", "entity"], categories: ["java"] },
-  { keywords: ["react", "jsx", "tsx", "hook", "usestate", "useeffect", "component"], categories: ["react", "frontend_js"] },
-  { keywords: ["vue", ".vue", "vuex", "composition"], categories: ["vue", "frontend_js"] },
-  { keywords: ["jquery", "$.", "$("], categories: ["jquery", "frontend_js"] },
-  { keywords: ["javascript", "typescript", "js", "ts", "ast", "복잡도", "complexity"], categories: ["frontend_js"] },
-  { keywords: ["sql", "query", "쿼리", "select", "insert", "update", "delete"], categories: ["sql"] },
-  { keywords: ["mybatis", "mapper", "xml"], categories: ["mybatis"] },
-  { keywords: ["css", "scss", "less", "style", "스타일"], categories: ["css"] },
-  { keywords: ["html", "jsp", "접근성", "a11y", "seo"], categories: ["html"] },
-  { keywords: ["python", ".py", "django", "flask", "fastapi"], categories: ["python"] },
-  { keywords: ["dependency", "의존성", "package.json", "pom.xml", "gradle", "취약점"], categories: ["dependency"] },
-  { keywords: ["openapi", "swagger", "api 스펙", "api spec"], categories: ["openapi"] },
-  { keywords: ["표준", "standard", "hwp", "pdf", "rag", "품질기준"], categories: ["standards"] },
-  { keywords: ["캐시", "cache", "요약", "summarize", "outline"], categories: ["cache"] },
-  { keywords: ["임베딩", "embedding", "벡터", "vector", "semantic", "의미검색", "인덱싱"], categories: ["embeddings"] },
-  { keywords: ["메모리", "memory", "컨텍스트", "context", "기억", "노트"], categories: ["memory"] },
-  { keywords: ["write", "쓰기", "실행", "run", "command", "명령"], categories: ["file_write"] },
-];
+// Tool name → TOOL_CATEGORIES category reverse lookup
+const TOOL_TO_CATEGORY: Record<string, string[]> = {};
+for (const [cat, toolNames] of Object.entries(TOOL_CATEGORIES)) {
+  for (const name of toolNames) {
+    if (!TOOL_TO_CATEGORY[name]) TOOL_TO_CATEGORY[name] = [];
+    TOOL_TO_CATEGORY[name].push(cat);
+  }
+}
+
+// Auto-generate keyword→category mapping from INTENT_PATTERNS (lazy to avoid circular init)
+let _keywordCategoriesCache: Array<{ keywords: string[]; categories: string[] }> | null = null;
+
+function getKeywordCategories(): Array<{ keywords: string[]; categories: string[] }> {
+  if (_keywordCategoriesCache) return _keywordCategoriesCache;
+
+  const result: Array<{ keywords: string[]; categories: string[] }> = [];
+
+  for (const pattern of INTENT_PATTERNS) {
+    const tool = pattern.tool;
+    if (tool === "_single_file") continue; // skip marker
+
+    const categories = TOOL_TO_CATEGORY[tool];
+    if (categories && categories.length > 0) {
+      result.push({ keywords: [...pattern.keywords], categories: [...categories] });
+    }
+  }
+
+  // Items only in hardcoded lists (not derived from INTENT_PATTERNS)
+  const EXTRA_KEYWORD_CATEGORIES: Array<{ keywords: string[]; categories: string[] }> = [
+    { keywords: ["jquery", "$.", "$("], categories: ["jquery", "frontend_js"] },
+    { keywords: ["javascript", "typescript", "js", "ts", "ast"], categories: ["frontend_js"] },
+    { keywords: ["mybatis", "mapper", "xml"], categories: ["mybatis"] },
+    { keywords: ["openapi", "swagger", "api 스펙", "api spec"], categories: ["openapi"] },
+    { keywords: ["표준", "standard", "hwp", "pdf", "rag", "품질기준"], categories: ["standards"] },
+    { keywords: ["캐시", "cache", "요약", "summarize", "outline"], categories: ["cache"] },
+    { keywords: ["임베딩", "embedding", "벡터", "vector", "semantic", "의미검색", "인덱싱"], categories: ["embeddings"] },
+    { keywords: ["메모리", "memory", "컨텍스트", "context", "기억", "노트"], categories: ["memory"] },
+    { keywords: ["write", "쓰기", "실행", "run", "command", "명령"], categories: ["file_write"] },
+  ];
+
+  result.push(...EXTRA_KEYWORD_CATEGORIES);
+  _keywordCategoriesCache = result;
+  return result;
+}
 
 // Select relevant tools based on user message (max ~15 tools)
 export function selectTools(userMessage: string): Tool[] {
@@ -135,7 +176,7 @@ export function selectTools(userMessage: string): Tool[] {
   }
 
   // Match keywords to categories
-  for (const { keywords, categories } of KEYWORD_CATEGORIES) {
+  for (const { keywords, categories } of getKeywordCategories()) {
     if (keywords.some((kw) => msg.includes(kw))) {
       for (const cat of categories) {
         const names = TOOL_CATEGORIES[cat];

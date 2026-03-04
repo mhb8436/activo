@@ -1,10 +1,11 @@
-import { Config, loadConfig, saveConfig } from "./config.js";
+import { Config, loadConfig, saveConfig, Provider } from "./config.js";
 
 export interface SlashCommandResult {
   output?: string;
   exit?: boolean;
   clear?: boolean;
   changeModel?: string;
+  changeProvider?: Provider;
   showHelp?: boolean;
 }
 
@@ -18,6 +19,8 @@ ACTIVO - AI 코드 품질 분석 도구
   /exit, /quit   종료
   /clear         채팅 기록 삭제
   /model <name>  모델 변경 (예: /model qwen2.5:7b)
+                 프로바이더 전환: /model anthropic:claude-sonnet-4-20250514
+                                 /model ollama:qwen2.5:7b
   /info          현재 설정 정보 표시
 
 [단축키]
@@ -55,30 +58,80 @@ const commandHandlers: Record<string, CommandHandler> = {
 
   model: (args, config) => {
     if (args.length === 0) {
+      const currentProvider = config.provider;
+      const currentModel =
+        currentProvider === "anthropic"
+          ? config.anthropic.model
+          : config.ollama.model;
       return {
-        output: `현재 모델: ${config.ollama.model}\n\n사용법: /model <model_name>\n예시: /model qwen2.5:7b`,
+        output: `현재 프로바이더: ${currentProvider}\n현재 모델: ${currentModel}\n\n사용법: /model <model_name>\n예시: /model qwen2.5:7b\n      /model anthropic:claude-sonnet-4-20250514\n      /model ollama:qwen2.5:7b`,
       };
     }
 
-    const newModel = args[0];
-    config.ollama.model = newModel;
+    const input = args[0];
+    let provider: Provider | undefined;
+    let newModel: string;
+
+    // Parse provider:model format
+    if (input.startsWith("anthropic:")) {
+      provider = "anthropic";
+      newModel = input.slice("anthropic:".length);
+    } else if (input.startsWith("ollama:")) {
+      provider = "ollama";
+      newModel = input.slice("ollama:".length);
+    } else if (input.startsWith("claude-") || input.startsWith("claude3")) {
+      // Auto-detect Anthropic models
+      provider = "anthropic";
+      newModel = input;
+    } else {
+      // Default: use current provider, or assume ollama
+      newModel = input;
+      provider = undefined; // keep current provider
+    }
+
+    if (provider === "anthropic") {
+      config.provider = "anthropic";
+      config.anthropic.model = newModel;
+    } else if (provider === "ollama") {
+      config.provider = "ollama";
+      config.ollama.model = newModel;
+    } else {
+      // No provider specified, change model for current provider
+      if (config.provider === "anthropic") {
+        config.anthropic.model = newModel;
+      } else {
+        config.ollama.model = newModel;
+      }
+    }
+
     saveConfig(config);
 
+    const displayProvider = provider || config.provider;
     return {
       changeModel: newModel,
-      output: `모델이 "${newModel}"로 변경되었습니다.`,
+      changeProvider: provider,
+      output: `[${displayProvider}] 모델이 "${newModel}"로 변경되었습니다.`,
     };
   },
 
   info: (args, config) => {
-    const info = `
-[ACTIVO 정보]
-  버전: 0.2.1
-
-[Ollama 설정]
+    const providerInfo =
+      config.provider === "anthropic"
+        ? `[Anthropic 설정]
+  모델: ${config.anthropic.model}
+  최대 토큰: ${config.anthropic.maxTokens}
+  API 키: ${config.anthropic.apiKey ? "config.json" : process.env.ANTHROPIC_API_KEY ? "환경변수" : "미설정"}`
+        : `[Ollama 설정]
   URL: ${config.ollama.baseUrl}
   모델: ${config.ollama.model}
-  컨텍스트: ${config.ollama.contextLength}
+  컨텍스트: ${config.ollama.contextLength}`;
+
+    const info = `
+[ACTIVO 정보]
+  버전: 0.4.4
+  프로바이더: ${config.provider}
+
+${providerInfo}
 
 [표준 디렉토리]
   ${config.standards.directory}

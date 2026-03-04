@@ -1,13 +1,16 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Box, Text, useApp, useInput } from "ink";
 import { Config } from "../core/config.js";
-import { OllamaClient, ChatMessage } from "../core/llm/ollama.js";
+import { OllamaClient } from "../core/llm/ollama.js";
+import { AnthropicClient } from "../core/llm/anthropic.js";
+import type { LLMClient, ChatMessage } from "../core/llm/types.js";
 import { streamProcessMessage, AgentEvent } from "../core/agent.js";
 import { handleSlashCommand } from "../core/commands.js";
+import type { Provider } from "../core/config.js";
 import { InputBox } from "./components/InputBox.js";
 import { MessageList } from "./components/MessageList.js";
 import { StatusBar } from "./components/StatusBar.js";
-import { ToolStatus } from "./components/ToolStatus.js";
+import { ToolStatus, extractToolDetail } from "./components/ToolStatus.js";
 import {
   createSession,
   loadLatestSession,
@@ -15,6 +18,7 @@ import {
   getSessionContext,
   cleanOldSessions,
 } from "../core/conversation.js";
+import { initMCPServers, shutdownMCPServers } from "../core/mcp/init.js";
 
 interface AppProps {
   initialPrompt?: string;
@@ -29,7 +33,22 @@ interface Message {
     tool: string;
     status: "running" | "complete" | "error";
     result?: string;
+    detail?: string;
   }>;
+}
+
+function createLLMClient(config: Config): LLMClient {
+  if (config.provider === "anthropic") {
+    return new AnthropicClient(config.anthropic);
+  }
+  return new OllamaClient(config.ollama);
+}
+
+function getDisplayModel(config: Config): string {
+  if (config.provider === "anthropic") {
+    return `anthropic:${config.anthropic.model}`;
+  }
+  return `ollama:${config.ollama.model}`;
 }
 
 export function App({ initialPrompt, config, resume }: AppProps): React.ReactElement {
@@ -38,10 +57,11 @@ export function App({ initialPrompt, config, resume }: AppProps): React.ReactEle
   const [input, setInput] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
   const [currentTool, setCurrentTool] = useState<string | null>(null);
+  const [currentToolDetail, setCurrentToolDetail] = useState<string | undefined>(undefined);
   const [toolStatus, setToolStatus] = useState<"running" | "complete" | "error" | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [client] = useState(() => new OllamaClient(config.ollama));
-  const [currentModel, setCurrentModel] = useState(config.ollama.model);
+  const [client, setClient] = useState<LLMClient>(() => createLLMClient(config));
+  const [currentModel, setCurrentModel] = useState(getDisplayModel(config));
   const [exitPending, setExitPending] = useState(false);
   const [cancelled, setCancelled] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -84,16 +104,25 @@ export function App({ initialPrompt, config, resume }: AppProps): React.ReactEle
     }
   });
 
-  // Check Ollama connection on mount
+  // Check LLM connection and initialize MCP servers on mount
   useEffect(() => {
     const checkConnection = async () => {
       const connected = await client.isConnected();
       if (!connected) {
-        setError(`Cannot connect to Ollama at ${config.ollama.baseUrl}`);
+        if (config.provider === "anthropic") {
+          setError("Cannot connect to Anthropic API. Check ANTHROPIC_API_KEY.");
+        } else {
+          setError(`Cannot connect to Ollama at ${config.ollama.baseUrl}`);
+        }
       }
+      // Initialize MCP servers (non-fatal)
+      await initMCPServers(config);
     };
     checkConnection();
-  }, [client, config.ollama.baseUrl]);
+    return () => {
+      shutdownMCPServers();
+    };
+  }, [client, config.provider, config.ollama.baseUrl]);
 
   // Load previous session context on mount (if resume)
   useEffect(() => {
@@ -156,9 +185,16 @@ export function App({ initialPrompt, config, resume }: AppProps): React.ReactEle
           return;
         }
 
-        if (result.changeModel) {
-          setCurrentModel(result.changeModel);
+        if (result.changeProvider) {
+          // Provider changed — recreate client
+          config.provider = result.changeProvider;
+          const newClient = createLLMClient(config);
+          setClient(newClient);
+          setCurrentModel(getDisplayModel(config));
+        } else if (result.changeModel) {
+          // Same provider, just change model
           client.setModel(result.changeModel);
+          setCurrentModel(getDisplayModel(config));
         }
 
         if (result.output) {
@@ -212,8 +248,10 @@ export function App({ initialPrompt, config, resume }: AppProps): React.ReactEle
             });
             break;
 
-          case "tool_use":
+          case "tool_use": {
+            const detail = extractToolDetail(event.tool || "", event.args);
             setCurrentTool(event.tool || null);
+            setCurrentToolDetail(detail);
             setToolStatus("running");
             setMessages((prev) => {
               const updated = [...prev];
@@ -221,12 +259,13 @@ export function App({ initialPrompt, config, resume }: AppProps): React.ReactEle
               if (last.role === "assistant") {
                 last.toolCalls = [
                   ...(last.toolCalls || []),
-                  { tool: event.tool!, status: "running" },
+                  { tool: event.tool!, status: "running", detail },
                 ];
               }
               return updated;
             });
             break;
+          }
 
           case "tool_result":
             setToolStatus(event.status as "complete" | "error");
@@ -244,6 +283,7 @@ export function App({ initialPrompt, config, resume }: AppProps): React.ReactEle
             });
             setTimeout(() => {
               setCurrentTool(null);
+              setCurrentToolDetail(undefined);
               setToolStatus(null);
             }, 500);
             break;
@@ -297,7 +337,7 @@ export function App({ initialPrompt, config, resume }: AppProps): React.ReactEle
 
       {/* Tool Status */}
       {currentTool && (
-        <ToolStatus tool={currentTool} status={toolStatus || "running"} />
+        <ToolStatus tool={currentTool} status={toolStatus || "running"} detail={currentToolDetail} />
       )}
 
       {/* Error */}

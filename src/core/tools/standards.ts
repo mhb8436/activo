@@ -200,14 +200,19 @@ function resolveOutputDir(outputDir: string | undefined): string {
     return path.resolve(".activo/standards");
   }
 
-  const normalized = outputDir.trim().toLowerCase();
+  const trimmed = outputDir.trim();
 
-  // Natural language mappings
+  // Exact match for current directory markers
+  if (trimmed === "." || trimmed === "./") {
+    return path.resolve(".");
+  }
+
+  // Natural language mappings (only match if the whole string is a natural language phrase)
+  const normalized = trimmed.toLowerCase();
   const currentDirPatterns = [
     "현재 디렉토리", "현재 폴더", "현재디렉토리", "현재폴더",
     "이 디렉토리", "이 폴더", "여기", "here",
     "current directory", "current folder", "current dir",
-    ".", "./"
   ];
 
   for (const pattern of currentDirPatterns) {

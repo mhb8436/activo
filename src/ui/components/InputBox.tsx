@@ -10,7 +10,7 @@ interface InputBoxProps {
   placeholder?: string;
 }
 
-export function InputBox({
+export const InputBox = React.memo(function InputBox({
   value,
   onChange,
   onSubmit,
@@ -34,4 +34,4 @@ export function InputBox({
       )}
     </Box>
   );
-}
+});

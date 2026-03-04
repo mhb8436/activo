@@ -1,0 +1,687 @@
+# Legacy Modernization Ruleset
+# 레거시 코드 현대화 규칙
+# - 전자정부프레임워크 3.x → 4.x 마이그레이션
+# - javax → jakarta 네임스페이스 마이그레이션
+# - Spring deprecated 클래스 교체
+# - iBatis → MyBatis 마이그레이션
+# - Java API 현대화
+version: "1.0"
+profile: "modernize"
+
+languages:
+  - language: java
+    rules:
+      # ==================== 1. 전자정부프레임워크 마이그레이션 ====================
+
+      - id: "mod-egov-001"
+        name: "egovframework.rte 패키지 사용"
+        severity: "medium"
+        category: "egov-migration"
+        description: "egovframework.rte.* 패키지는 전자정부프레임워크 4.0에서 org.egovframe.rte.*로 변경되었습니다. 마이그레이션 시 변경 필요."
+        enabled: true
+        pattern:
+          type: "ast-import"
+          import: "^egovframework\\.rte\\."
+        custom:
+          rule_id: "MOD-EGOV-001"
+          fix: "import를 org.egovframe.rte.*로 변경하세요"
+          since: "eGovFrame 4.0"
+
+      - id: "mod-egov-002"
+        name: "AbstractServiceImpl 사용 (구버전)"
+        severity: "high"
+        category: "egov-migration"
+        description: "AbstractServiceImpl은 eGovFrame 3.0 이전 클래스입니다. EgovAbstractServiceImpl을 사용하세요."
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "extends\\s+AbstractServiceImpl\\b"
+        custom:
+          rule_id: "MOD-EGOV-002"
+          fix: "EgovAbstractServiceImpl을 상속하세요"
+          since: "eGovFrame 3.0"
+
+      - id: "mod-egov-003"
+        name: "EgovAbstractDAO 사용 (iBatis 기반)"
+        severity: "high"
+        category: "egov-migration"
+        description: "EgovAbstractDAO는 iBatis 기반 클래스입니다. MyBatis 기반 EgovAbstractMapper를 사용하세요."
+        enabled: false  # egov-dao-001과 동일 regex 중복
+        pattern:
+          type: "regex"
+          regex: "extends\\s+EgovAbstractDAO\\b"
+        custom:
+          rule_id: "MOD-EGOV-003"
+          fix: "EgovAbstractMapper를 상속하세요"
+          since: "eGovFrame 3.0"
+
+      - id: "mod-egov-004"
+        name: "eGovFrame 구버전 보안 XSD 참조"
+        severity: "medium"
+        category: "egov-migration"
+        description: "eGovFrame 3.x XSD 스키마를 참조하고 있습니다. 4.0 버전으로 업데이트하세요."
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "egov-(security|access|crypto)-[123]\\.[0-9]\\.xsd"
+        custom:
+          rule_id: "MOD-EGOV-004"
+          fix: "egov-security-4.0.xsd, egov-access-4.0.xsd 등으로 변경하세요"
+
+      - id: "mod-egov-005"
+        name: "egovframework 리소스 경로 사용"
+        severity: "medium"
+        category: "egov-migration"
+        description: "classpath:/egovframework/ 경로는 4.0에서 classpath:/org/egovframe/로 변경되었습니다."
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "classpath[*]?:/egovframework/"
+        custom:
+          rule_id: "MOD-EGOV-005"
+          fix: "classpath:/org/egovframe/ 경로로 변경하세요"
+
+      # ==================== 2. javax → jakarta 마이그레이션 ====================
+
+      - id: "mod-jakarta-001"
+        name: "javax.servlet 사용"
+        severity: "medium"
+        category: "jakarta-migration"
+        description: "javax.servlet은 Spring Boot 3.x/Jakarta EE 9+에서 jakarta.servlet으로 변경되었습니다. Spring Boot 2.x/eGovFrame 3.x에서는 정상."
+        enabled: true
+        pattern:
+          type: "ast-import"
+          import: "^javax\\.servlet\\."
+        custom:
+          rule_id: "MOD-JAKARTA-001"
+          fix: "jakarta.servlet 패키지로 변경하세요"
+          since: "Jakarta EE 9 / Spring Boot 3.0"
+
+      - id: "mod-jakarta-002"
+        name: "javax.persistence 사용"
+        severity: "high"
+        category: "jakarta-migration"
+        description: "javax.persistence는 Jakarta EE 9+에서 jakarta.persistence로 변경되었습니다."
+        enabled: true
+        pattern:
+          type: "ast-import"
+          import: "^javax\\.persistence\\."
+        custom:
+          rule_id: "MOD-JAKARTA-002"
+          fix: "jakarta.persistence 패키지로 변경하세요"
+
+      - id: "mod-jakarta-003"
+        name: "javax.validation 사용"
+        severity: "high"
+        category: "jakarta-migration"
+        description: "javax.validation은 Jakarta EE 9+에서 jakarta.validation으로 변경되었습니다."
+        enabled: true
+        pattern:
+          type: "ast-import"
+          import: "^javax\\.validation\\."
+        custom:
+          rule_id: "MOD-JAKARTA-003"
+          fix: "jakarta.validation 패키지로 변경하세요"
+
+      - id: "mod-jakarta-004"
+        name: "javax.inject 사용"
+        severity: "high"
+        category: "jakarta-migration"
+        description: "javax.inject는 Jakarta EE 9+에서 jakarta.inject로 변경되었습니다."
+        enabled: true
+        pattern:
+          type: "ast-import"
+          import: "^javax\\.inject\\."
+        custom:
+          rule_id: "MOD-JAKARTA-004"
+          fix: "jakarta.inject 패키지로 변경하세요"
+
+      - id: "mod-jakarta-005"
+        name: "javax.annotation 사용"
+        severity: "medium"
+        category: "jakarta-migration"
+        description: "javax.annotation은 Jakarta EE 9+에서 jakarta.annotation으로 변경되었습니다."
+        enabled: true
+        pattern:
+          type: "ast-import"
+          import: "^javax\\.annotation\\."
+        custom:
+          rule_id: "MOD-JAKARTA-005"
+          fix: "jakarta.annotation 패키지로 변경하세요"
+
+      - id: "mod-jakarta-006"
+        name: "javax.mail 사용"
+        severity: "medium"
+        category: "jakarta-migration"
+        description: "javax.mail은 Jakarta EE 9+에서 jakarta.mail로 변경되었습니다."
+        enabled: true
+        pattern:
+          type: "ast-import"
+          import: "^javax\\.mail\\."
+        custom:
+          rule_id: "MOD-JAKARTA-006"
+          fix: "jakarta.mail 패키지로 변경하세요"
+
+      - id: "mod-jakarta-007"
+        name: "javax.websocket 사용"
+        severity: "medium"
+        category: "jakarta-migration"
+        description: "javax.websocket은 Jakarta EE 9+에서 jakarta.websocket으로 변경되었습니다."
+        enabled: true
+        pattern:
+          type: "ast-import"
+          import: "^javax\\.websocket\\."
+        custom:
+          rule_id: "MOD-JAKARTA-007"
+          fix: "jakarta.websocket 패키지로 변경하세요"
+
+      - id: "mod-jakarta-008"
+        name: "javax.xml.bind (JAXB) 사용"
+        severity: "high"
+        category: "jakarta-migration"
+        description: "javax.xml.bind(JAXB)는 JDK 11에서 제거되었습니다. jakarta.xml.bind 또는 별도 라이브러리를 사용하세요."
+        enabled: true
+        pattern:
+          type: "ast-import"
+          import: "^javax\\.xml\\.bind\\."
+        custom:
+          rule_id: "MOD-JAKARTA-008"
+          fix: "jakarta.xml.bind 또는 org.glassfish.jaxb 라이브러리를 사용하세요"
+
+      - id: "mod-jakarta-009"
+        name: "javax.ws.rs (JAX-RS) 사용"
+        severity: "medium"
+        category: "jakarta-migration"
+        description: "javax.ws.rs는 Jakarta EE 9+에서 jakarta.ws.rs로 변경되었습니다."
+        enabled: true
+        pattern:
+          type: "ast-import"
+          import: "^javax\\.ws\\.rs\\."
+        custom:
+          rule_id: "MOD-JAKARTA-009"
+          fix: "jakarta.ws.rs 패키지로 변경하세요"
+
+      - id: "mod-jakarta-010"
+        name: "javax.enterprise (CDI) 사용"
+        severity: "medium"
+        category: "jakarta-migration"
+        description: "javax.enterprise는 Jakarta EE 9+에서 jakarta.enterprise로 변경되었습니다."
+        enabled: true
+        pattern:
+          type: "ast-import"
+          import: "^javax\\.enterprise\\."
+        custom:
+          rule_id: "MOD-JAKARTA-010"
+          fix: "jakarta.enterprise 패키지로 변경하세요"
+
+      # ==================== 3. Spring deprecated 클래스 ====================
+
+      - id: "mod-spring-001"
+        name: "WebMvcConfigurerAdapter 사용"
+        severity: "high"
+        category: "spring-migration"
+        description: "WebMvcConfigurerAdapter는 Spring 5.0에서 deprecated되었습니다. WebMvcConfigurer 인터페이스를 직접 implements하세요."
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "extends\\s+WebMvcConfigurerAdapter\\b"
+        custom:
+          rule_id: "MOD-SPRING-001"
+          fix: "implements WebMvcConfigurer로 변경하세요"
+          since: "Spring 5.0"
+
+      - id: "mod-spring-002"
+        name: "HandlerInterceptorAdapter 사용"
+        severity: "high"
+        category: "spring-migration"
+        description: "HandlerInterceptorAdapter는 Spring 5.3에서 deprecated되었습니다. HandlerInterceptor 인터페이스를 implements하세요."
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "extends\\s+HandlerInterceptorAdapter\\b"
+        custom:
+          rule_id: "MOD-SPRING-002"
+          fix: "implements HandlerInterceptor로 변경하세요"
+          since: "Spring 5.3"
+
+      - id: "mod-spring-003"
+        name: "WebSecurityConfigurerAdapter 사용"
+        severity: "high"
+        category: "spring-migration"
+        description: "WebSecurityConfigurerAdapter는 Spring Security 5.7에서 deprecated되었습니다. SecurityFilterChain Bean 방식을 사용하세요."
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "extends\\s+WebSecurityConfigurerAdapter\\b"
+        custom:
+          rule_id: "MOD-SPRING-003"
+          fix: "@Bean SecurityFilterChain 방식으로 변경하세요"
+          since: "Spring Security 5.7"
+
+      - id: "mod-spring-004"
+        name: "DefaultAnnotationHandlerMapping 사용"
+        severity: "high"
+        category: "spring-migration"
+        description: "DefaultAnnotationHandlerMapping은 Spring 3.1에서 deprecated되었습니다."
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "DefaultAnnotationHandlerMapping"
+        custom:
+          rule_id: "MOD-SPRING-004"
+          fix: "RequestMappingHandlerMapping을 사용하세요"
+          since: "Spring 3.1"
+
+      - id: "mod-spring-005"
+        name: "AnnotationMethodHandlerAdapter 사용"
+        severity: "high"
+        category: "spring-migration"
+        description: "AnnotationMethodHandlerAdapter는 Spring 3.1에서 deprecated되었습니다."
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "AnnotationMethodHandlerAdapter"
+        custom:
+          rule_id: "MOD-SPRING-005"
+          fix: "RequestMappingHandlerAdapter를 사용하세요"
+          since: "Spring 3.1"
+
+      - id: "mod-spring-006"
+        name: "AsyncRestTemplate 사용"
+        severity: "medium"
+        category: "spring-migration"
+        description: "AsyncRestTemplate은 Spring 5.0에서 deprecated되었습니다. WebClient를 사용하세요."
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "AsyncRestTemplate"
+        custom:
+          rule_id: "MOD-SPRING-006"
+          fix: "WebClient 또는 RestClient를 사용하세요"
+          since: "Spring 5.0"
+
+      - id: "mod-spring-007"
+        name: "CallableProcessingInterceptorAdapter 사용"
+        severity: "medium"
+        category: "spring-migration"
+        description: "CallableProcessingInterceptorAdapter는 Spring 5.0에서 deprecated되었습니다."
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "extends\\s+CallableProcessingInterceptorAdapter\\b"
+        custom:
+          rule_id: "MOD-SPRING-007"
+          fix: "implements CallableProcessingInterceptor로 변경하세요"
+
+      - id: "mod-spring-008"
+        name: "ChannelInterceptorAdapter 사용"
+        severity: "medium"
+        category: "spring-migration"
+        description: "ChannelInterceptorAdapter는 Spring 5.0에서 deprecated되었습니다."
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "extends\\s+ChannelInterceptorAdapter\\b"
+        custom:
+          rule_id: "MOD-SPRING-008"
+          fix: "implements ChannelInterceptor로 변경하세요"
+
+      - id: "mod-spring-009"
+        name: "@RequestMapping(method=...) 대신 전용 어노테이션 사용"
+        severity: "low"
+        category: "spring-migration"
+        description: "@RequestMapping(method=RequestMethod.GET)은 @GetMapping으로 간결하게 표현할 수 있습니다."
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "@RequestMapping\\s*\\([^)]*method\\s*=\\s*RequestMethod\\.(GET|POST|PUT|DELETE|PATCH)"
+        custom:
+          rule_id: "MOD-SPRING-009"
+          fix: "@GetMapping, @PostMapping, @PutMapping, @DeleteMapping, @PatchMapping을 사용하세요"
+          since: "Spring 4.3"
+
+      - id: "mod-spring-010"
+        name: "new ModelAndView() 사용"
+        severity: "low"
+        category: "spring-migration"
+        description: "ModelAndView 객체 직접 생성 방식은 레거시입니다. String 반환 + Model 파라미터 또는 ResponseEntity를 사용하세요."
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "new\\s+ModelAndView\\s*\\("
+        custom:
+          rule_id: "MOD-SPRING-010"
+          fix: "메서드 반환 타입을 String으로 하고 Model 파라미터를 사용하세요"
+
+      # ==================== 4. iBatis → MyBatis 마이그레이션 ====================
+
+      - id: "mod-ibatis-001"
+        name: "getSqlMapClient() 호출"
+        severity: "critical"
+        category: "ibatis-migration"
+        description: "getSqlMapClient()은 iBatis 전용 메서드입니다. MyBatis의 getSqlSession()을 사용하세요."
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "getSqlMapClient\\s*\\("
+        custom:
+          rule_id: "MOD-IBATIS-001"
+          fix: "getSqlSession() 또는 Mapper 인터페이스를 사용하세요"
+
+      - id: "mod-ibatis-002"
+        name: "SqlMapClientDaoSupport 사용"
+        severity: "critical"
+        category: "ibatis-migration"
+        description: "SqlMapClientDaoSupport는 iBatis 기반 클래스입니다. MyBatis의 SqlSessionDaoSupport 또는 EgovAbstractMapper를 사용하세요."
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "extends\\s+SqlMapClientDaoSupport\\b"
+        custom:
+          rule_id: "MOD-IBATIS-002"
+          fix: "SqlSessionDaoSupport 또는 EgovAbstractMapper를 상속하세요"
+
+      - id: "mod-ibatis-003"
+        name: "queryForObject() 사용 (iBatis)"
+        severity: "high"
+        category: "ibatis-migration"
+        description: "queryForObject()는 iBatis 메서드입니다. MyBatis의 selectOne()을 사용하세요."
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "\\.queryForObject\\s*\\("
+        custom:
+          rule_id: "MOD-IBATIS-003"
+          fix: "selectOne() 또는 Mapper 인터페이스 메서드를 사용하세요"
+
+      - id: "mod-ibatis-004"
+        name: "queryForList() 사용 (iBatis)"
+        severity: "high"
+        category: "ibatis-migration"
+        description: "queryForList()는 iBatis 메서드입니다. MyBatis의 selectList()를 사용하세요."
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "\\.queryForList\\s*\\("
+        custom:
+          rule_id: "MOD-IBATIS-004"
+          fix: "selectList() 또는 Mapper 인터페이스 메서드를 사용하세요"
+
+      - id: "mod-ibatis-005"
+        name: "sqlMapClient 변수 참조"
+        severity: "high"
+        category: "ibatis-migration"
+        description: "sqlMapClient는 iBatis 관련 객체입니다. MyBatis의 SqlSession 또는 Mapper를 사용하세요."
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "\\bsqlMapClient\\b"
+        custom:
+          rule_id: "MOD-IBATIS-005"
+          fix: "SqlSession 또는 Mapper 인터페이스를 사용하세요"
+
+      - id: "mod-ibatis-006"
+        name: "iBatis sqlMap import"
+        severity: "high"
+        category: "ibatis-migration"
+        description: "com.ibatis.* 패키지는 iBatis 전용입니다. MyBatis(org.apache.ibatis)로 마이그레이션하세요."
+        enabled: true
+        pattern:
+          type: "ast-import"
+          import: "^com\\.ibatis\\."
+        custom:
+          rule_id: "MOD-IBATIS-006"
+          fix: "org.apache.ibatis.* 또는 MyBatis Mapper 인터페이스를 사용하세요"
+
+      - id: "mod-ibatis-007"
+        name: "iBatis queryForInt/queryForLong 사용"
+        severity: "high"
+        category: "ibatis-migration"
+        description: "queryForInt()/queryForLong()은 iBatis 메서드이며 Spring에서도 deprecated되었습니다."
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "\\.queryFor(Int|Long)\\s*\\("
+        custom:
+          rule_id: "MOD-IBATIS-007"
+          fix: "queryForObject(sql, Integer.class) 또는 selectOne() + 타입 캐스팅을 사용하세요"
+
+      - id: "mod-ibatis-008"
+        name: "SimpleTriggerBean/CronTriggerBean 사용"
+        severity: "medium"
+        category: "ibatis-migration"
+        description: "SimpleTriggerBean/CronTriggerBean은 deprecated된 Quartz 설정 클래스입니다."
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "(Simple|Cron)TriggerBean\\b"
+        custom:
+          rule_id: "MOD-IBATIS-008"
+          fix: "SimpleTriggerFactoryBean / CronTriggerFactoryBean을 사용하세요"
+
+      # ==================== 5. Java API 현대화 ====================
+
+      - id: "mod-java-001"
+        name: "new Date() 사용"
+        severity: "low"
+        category: "java-modernize"
+        description: "new Date()는 레거시 API입니다. Java 8+ java.time API를 사용하세요."
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "new\\s+Date\\s*\\(\\s*\\)"
+        custom:
+          rule_id: "MOD-JAVA-001"
+          fix: "LocalDateTime.now() 또는 Instant.now()를 사용하세요"
+
+      - id: "mod-java-002"
+        name: "static SimpleDateFormat (스레드 안전 위반)"
+        severity: "high"
+        category: "java-modernize"
+        description: "SimpleDateFormat을 static으로 선언하면 멀티스레드 환경에서 오류가 발생합니다."
+        enabled: false  # quality-legacy-008과 동일 regex 중복
+        pattern:
+          type: "regex"
+          regex: "static\\s+.*SimpleDateFormat\\s+\\w+"
+        custom:
+          rule_id: "MOD-JAVA-002"
+          fix: "DateTimeFormatter(thread-safe)를 사용하세요"
+
+      - id: "mod-java-003"
+        name: "Calendar.getInstance() 사용"
+        severity: "low"
+        category: "java-modernize"
+        description: "Calendar는 레거시 API입니다. Java 8+ java.time API를 사용하세요."
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "Calendar\\.getInstance\\s*\\("
+        custom:
+          rule_id: "MOD-JAVA-003"
+          fix: "LocalDate.now(), LocalDateTime.now() 등을 사용하세요"
+
+      - id: "mod-java-004"
+        name: "Vector 사용"
+        severity: "medium"
+        category: "java-modernize"
+        description: "Vector는 synchronized로 인해 불필요한 오버헤드가 있습니다. ArrayList 또는 CopyOnWriteArrayList를 사용하세요."
+        enabled: false  # quality-legacy-001과 동일 regex 중복
+        pattern:
+          type: "regex"
+          regex: "new\\s+Vector\\s*[<(]"
+        custom:
+          rule_id: "MOD-JAVA-004"
+          fix: "ArrayList(단일스레드) 또는 CopyOnWriteArrayList(멀티스레드)를 사용하세요"
+
+      - id: "mod-java-005"
+        name: "Hashtable 사용"
+        severity: "medium"
+        category: "java-modernize"
+        description: "Hashtable은 synchronized로 인해 불필요한 오버헤드가 있고 null을 허용하지 않습니다."
+        enabled: false  # quality-legacy-002와 동일 regex 중복
+        pattern:
+          type: "regex"
+          regex: "new\\s+Hashtable\\s*[<(]"
+        custom:
+          rule_id: "MOD-JAVA-005"
+          fix: "HashMap(단일스레드) 또는 ConcurrentHashMap(멀티스레드)를 사용하세요"
+
+      - id: "mod-java-006"
+        name: "StringTokenizer 사용"
+        severity: "low"
+        category: "java-modernize"
+        description: "StringTokenizer는 레거시 클래스입니다. String.split() 또는 Pattern을 사용하세요."
+        enabled: false  # quality-legacy-003과 동일 regex 중복
+        pattern:
+          type: "regex"
+          regex: "new\\s+StringTokenizer\\s*\\("
+        custom:
+          rule_id: "MOD-JAVA-006"
+          fix: "String.split() 또는 java.util.regex.Pattern을 사용하세요"
+
+      - id: "mod-java-007"
+        name: "log4j 1.x 직접 사용"
+        severity: "high"
+        category: "java-modernize"
+        description: "Apache Log4j 1.x는 EOL이며 보안 취약점이 있습니다. SLF4J + Logback을 사용하세요."
+        enabled: false  # quality-legacy-006과 동일 regex 중복
+        pattern:
+          type: "ast-import"
+          import: "^org\\.apache\\.log4j\\."
+        custom:
+          rule_id: "MOD-JAVA-007"
+          fix: "org.slf4j.Logger + Logback을 사용하세요"
+
+      - id: "mod-java-008"
+        name: "HSSFWorkbook 사용 (Excel 97-2003 전용)"
+        severity: "medium"
+        category: "java-modernize"
+        description: "HSSFWorkbook은 .xls(97-2003) 전용입니다. SXSSFWorkbook(.xlsx)을 사용하면 대용량도 처리 가능합니다."
+        enabled: false  # quality-legacy-004와 동일 regex 중복
+        pattern:
+          type: "regex"
+          regex: "new\\s+HSSFWorkbook\\s*\\("
+        custom:
+          rule_id: "MOD-JAVA-008"
+          fix: "SXSSFWorkbook(대용량) 또는 XSSFWorkbook(.xlsx)을 사용하세요"
+
+      - id: "mod-java-009"
+        name: "commons-lang 구버전 사용"
+        severity: "medium"
+        category: "java-modernize"
+        description: "org.apache.commons.lang은 EOL입니다. commons-lang3을 사용하세요."
+        enabled: false  # quality-ast-005와 동일 regex 중복
+        pattern:
+          type: "ast-import"
+          import: "^org\\.apache\\.commons\\.lang\\."
+        custom:
+          rule_id: "MOD-JAVA-009"
+          fix: "org.apache.commons.lang3 패키지로 마이그레이션하세요"
+
+      - id: "mod-java-010"
+        name: "sun.* 내부 API 사용"
+        severity: "high"
+        category: "java-modernize"
+        description: "sun.* 패키지는 JDK 내부 API로 JDK 버전 간 호환성이 보장되지 않습니다."
+        enabled: false  # quality-ast-006과 동일 regex 중복
+        pattern:
+          type: "ast-import"
+          import: "^sun\\."
+        custom:
+          rule_id: "MOD-JAVA-010"
+          fix: "공식 Java API 또는 표준 라이브러리를 사용하세요"
+
+      - id: "mod-java-011"
+        name: "BeanUtils.copyProperties() 사용"
+        severity: "low"
+        category: "java-modernize"
+        description: "BeanUtils.copyProperties()는 리플렉션 기반이라 성능이 낮고 타입 안전하지 않습니다."
+        enabled: false  # quality-legacy-007과 동일 regex 중복
+        pattern:
+          type: "regex"
+          regex: "BeanUtils\\.copyProperties\\s*\\("
+        custom:
+          rule_id: "MOD-JAVA-011"
+          fix: "MapStruct(컴파일타임 매핑) 또는 명시적 setter 호출을 사용하세요"
+
+      - id: "mod-java-012"
+        name: "Enumeration 사용"
+        severity: "low"
+        category: "java-modernize"
+        description: "Enumeration은 레거시 인터페이스입니다. Iterator 또는 Stream을 사용하세요."
+        enabled: false  # quality-legacy-005와 동일 regex 중복
+        pattern:
+          type: "regex"
+          regex: "\\bEnumeration\\s*<"
+        custom:
+          rule_id: "MOD-JAVA-012"
+          fix: "Iterator 또는 Stream API를 사용하세요"
+
+  - language: xml
+    rules:
+      # ==================== 6. XML 설정 현대화 ====================
+
+      - id: "mod-xml-001"
+        name: "iBatis sqlMap XML 설정"
+        severity: "high"
+        category: "ibatis-migration"
+        description: "<sqlMap> 태그는 iBatis 설정입니다. MyBatis의 <mapper> 태그로 변경하세요."
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "<sqlMap\\b"
+        custom:
+          rule_id: "MOD-XML-001"
+          fix: "<mapper namespace=\"...\">로 변경하세요"
+
+      - id: "mod-xml-002"
+        name: "iBatis isNotNull/isEqual 태그"
+        severity: "high"
+        category: "ibatis-migration"
+        description: "<isNotNull>, <isEqual> 등은 iBatis 동적 SQL 태그입니다. MyBatis의 <if test=\"...\">로 변경하세요."
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "<(isNotNull|isNotEmpty|isNull|isEmpty|isEqual|isNotEqual|isGreaterThan|isLessThan)\\b"
+        custom:
+          rule_id: "MOD-XML-002"
+          fix: "<if test=\"...\"> 또는 <choose>/<when> 으로 변경하세요"
+
+      - id: "mod-xml-003"
+        name: "iBatis iterate 태그"
+        severity: "high"
+        category: "ibatis-migration"
+        description: "<iterate>는 iBatis 태그입니다. MyBatis의 <foreach>로 변경하세요."
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "<iterate\\b"
+        custom:
+          rule_id: "MOD-XML-003"
+          fix: "<foreach collection=\"list\" item=\"item\" ...>으로 변경하세요"
+
+      - id: "mod-xml-004"
+        name: "iBatis #variable# 파라미터 구문"
+        severity: "high"
+        category: "ibatis-migration"
+        description: "#variable# 구문은 iBatis 파라미터 바인딩입니다. MyBatis의 #{variable}로 변경하세요."
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "#[a-zA-Z_][a-zA-Z0-9_]*#"
+        custom:
+          rule_id: "MOD-XML-004"
+          fix: "#{variable} 형식으로 변경하세요"
+
+      - id: "mod-xml-005"
+        name: "Spring bean XML 설정에서 deprecated 클래스 참조"
+        severity: "medium"
+        category: "spring-migration"
+        description: "Spring XML 설정에서 deprecated된 클래스가 참조되고 있습니다."
+        enabled: true
+        pattern:
+          type: "regex"
+          regex: "class=\"org\\.springframework\\.(web\\.servlet\\.mvc\\.annotation\\.(AnnotationMethodHandlerAdapter|DefaultAnnotationHandlerMapping)|scheduling\\.quartz\\.(Simple|Cron)TriggerBean)"
+        custom:
+          rule_id: "MOD-XML-005"
+          fix: "최신 Spring 클래스로 변경하세요"
