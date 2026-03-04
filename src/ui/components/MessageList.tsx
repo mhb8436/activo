@@ -1,5 +1,5 @@
 import React from "react";
-import { Box, Text } from "ink";
+import { Box, Text, Static } from "ink";
 
 interface ToolCall {
   tool: string;
@@ -9,6 +9,7 @@ interface ToolCall {
 }
 
 interface Message {
+  id: string;
   role: "user" | "assistant";
   content: string;
   toolCalls?: ToolCall[];
@@ -27,16 +28,23 @@ export const MessageList = React.memo(function MessageList({ messages }: Message
     );
   }
 
+  const stableCount = Math.max(0, messages.length - 1);
+  const staticMessages = messages.slice(0, stableCount);
+  const pendingMessages = messages.slice(stableCount);
+
   return (
     <Box flexDirection="column">
-      {messages.map((message, index) => (
-        <MessageItem key={index} message={message} />
+      <Static items={staticMessages}>
+        {(message) => <MessageItem key={message.id} message={message} />}
+      </Static>
+      {pendingMessages.map((message) => (
+        <MessageItem key={message.id} message={message} />
       ))}
     </Box>
   );
 });
 
-function MessageItem({ message }: { message: Message }): React.ReactElement {
+const MessageItem = React.memo(function MessageItem({ message }: { message: Message }): React.ReactElement {
   const isUser = message.role === "user";
 
   return (
@@ -76,7 +84,7 @@ function MessageItem({ message }: { message: Message }): React.ReactElement {
       )}
     </Box>
   );
-}
+});
 
 function truncate(text: string, maxLength: number): string {
   if (text.length <= maxLength) return text;

@@ -27,6 +27,7 @@ interface AppProps {
 }
 
 interface Message {
+  id: string;
   role: "user" | "assistant";
   content: string;
   toolCalls?: Array<{
@@ -35,6 +36,11 @@ interface Message {
     result?: string;
     detail?: string;
   }>;
+}
+
+let messageIdCounter = 0;
+function nextMessageId(): string {
+  return `msg-${Date.now()}-${++messageIdCounter}`;
 }
 
 function createLLMClient(config: Config): LLMClient {
@@ -54,7 +60,6 @@ function getDisplayModel(config: Config): string {
 export function App({ initialPrompt, config, resume }: AppProps): React.ReactElement {
   const { exit } = useApp();
   const [messages, setMessages] = useState<Message[]>([]);
-  const [input, setInput] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
   const [currentTool, setCurrentTool] = useState<string | null>(null);
   const [currentToolDetail, setCurrentToolDetail] = useState<string | undefined>(undefined);
@@ -138,6 +143,7 @@ export function App({ initialPrompt, config, resume }: AppProps): React.ReactEle
             const displayMessages: Message[] = recentMessages
               .filter(m => m.role === "user" || m.role === "assistant")
               .map(m => ({
+                id: nextMessageId(),
                 role: m.role as "user" | "assistant",
                 content: m.content,
               }));
@@ -163,7 +169,6 @@ export function App({ initialPrompt, config, resume }: AppProps): React.ReactEle
   const handleSubmit = useCallback(async (text: string) => {
     if (!text.trim() || isProcessing) return;
 
-    setInput("");
     setError(null);
 
     // Handle slash commands first
@@ -171,10 +176,10 @@ export function App({ initialPrompt, config, resume }: AppProps): React.ReactEle
       const result = handleSlashCommand(text, config);
       if (result) {
         // Add command as user message
-        setMessages((prev) => [...prev, { role: "user", content: text }]);
+        setMessages((prev) => [...prev, { id: nextMessageId(), role: "user", content: text }]);
 
         if (result.exit) {
-          const exitMsg: Message = { role: "assistant", content: result.output || "Goodbye!" };
+          const exitMsg: Message = { id: nextMessageId(), role: "assistant", content: result.output || "Goodbye!" };
           setMessages((prev) => [...prev, exitMsg]);
           setTimeout(() => exit(), 500);
           return;
@@ -198,7 +203,7 @@ export function App({ initialPrompt, config, resume }: AppProps): React.ReactEle
         }
 
         if (result.output) {
-          const outputMsg: Message = { role: "assistant", content: result.output };
+          const outputMsg: Message = { id: nextMessageId(), role: "assistant", content: result.output };
           setMessages((prev) => [...prev, outputMsg]);
         }
 
@@ -214,7 +219,7 @@ export function App({ initialPrompt, config, resume }: AppProps): React.ReactEle
     abortControllerRef.current = abortController;
 
     // Add user message
-    const userMessage: Message = { role: "user", content: text };
+    const userMessage: Message = { id: nextMessageId(), role: "user", content: text };
     setMessages((prev) => [...prev, userMessage]);
 
     // Convert messages to chat format
@@ -224,7 +229,7 @@ export function App({ initialPrompt, config, resume }: AppProps): React.ReactEle
     }));
 
     // Create assistant message placeholder
-    const assistantMessage: Message = { role: "assistant", content: "", toolCalls: [] };
+    const assistantMessage: Message = { id: nextMessageId(), role: "assistant", content: "", toolCalls: [] };
     setMessages((prev) => [...prev, assistantMessage]);
 
     try {
@@ -240,9 +245,10 @@ export function App({ initialPrompt, config, resume }: AppProps): React.ReactEle
             fullContent += event.content || "";
             setMessages((prev) => {
               const updated = [...prev];
-              const last = updated[updated.length - 1];
-              if (last.role === "assistant") {
-                last.content = fullContent;
+              const lastIdx = updated.length - 1;
+              if (updated[lastIdx].role === "assistant") {
+                // 새 객체 생성 (React.memo가 변경 감지하도록)
+                updated[lastIdx] = { ...updated[lastIdx], content: fullContent };
               }
               return updated;
             });
@@ -255,12 +261,16 @@ export function App({ initialPrompt, config, resume }: AppProps): React.ReactEle
             setToolStatus("running");
             setMessages((prev) => {
               const updated = [...prev];
-              const last = updated[updated.length - 1];
-              if (last.role === "assistant") {
-                last.toolCalls = [
-                  ...(last.toolCalls || []),
-                  { tool: event.tool!, status: "running", detail },
-                ];
+              const lastIdx = updated.length - 1;
+              if (updated[lastIdx].role === "assistant") {
+                // 새 객체 생성 (React.memo가 변경 감지하도록)
+                updated[lastIdx] = {
+                  ...updated[lastIdx],
+                  toolCalls: [
+                    ...(updated[lastIdx].toolCalls || []),
+                    { tool: event.tool!, status: "running", detail },
+                  ],
+                };
               }
               return updated;
             });
@@ -271,13 +281,18 @@ export function App({ initialPrompt, config, resume }: AppProps): React.ReactEle
             setToolStatus(event.status as "complete" | "error");
             setMessages((prev) => {
               const updated = [...prev];
-              const last = updated[updated.length - 1];
+              const lastIdx = updated.length - 1;
+              const last = updated[lastIdx];
               if (last.role === "assistant" && last.toolCalls) {
-                const toolCall = last.toolCalls.find((tc) => tc.tool === event.tool);
-                if (toolCall) {
-                  toolCall.status = event.status as "complete" | "error";
-                  toolCall.result = event.result?.content || event.result?.error;
-                }
+                // 새 toolCalls 배열 + 새 객체 생성
+                updated[lastIdx] = {
+                  ...last,
+                  toolCalls: last.toolCalls.map((tc) =>
+                    tc.tool === event.tool
+                      ? { ...tc, status: event.status as "complete" | "error", result: event.result?.content || event.result?.error }
+                      : tc
+                  ),
+                };
               }
               return updated;
             });
@@ -356,8 +371,6 @@ export function App({ initialPrompt, config, resume }: AppProps): React.ReactEle
 
       {/* Input */}
       <InputBox
-        value={input}
-        onChange={setInput}
         onSubmit={handleSubmit}
         isProcessing={isProcessing}
         placeholder="Type your message..."

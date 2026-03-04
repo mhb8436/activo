@@ -112,7 +112,7 @@ export async function processMessage(
   const toolCallResults: AgentResult["toolCalls"] = [];
   let finalContent = "";
   let iterations = 0;
-  const maxIterations = 10;
+  const maxIterations = 30;
   const recentSignatures: string[] = [];
 
   while (iterations < maxIterations) {
@@ -123,9 +123,26 @@ export async function processMessage(
     const response = await client.chat(messages, tools as Tool[]);
     messages.push(response);
 
-    // If no tool calls, we're done
+    // If no tool calls, we're done — but check if final answer is empty
     if (!response.toolCalls?.length) {
       finalContent = response.content;
+      // 도구를 실행했는데 최종 응답이 비어있으면 → LLM에게 요약 강제 요청
+      if (!finalContent && toolCallResults.length > 0) {
+        messages.push({
+          role: "user",
+          content: "도구 실행이 완료되었습니다. 결과를 요약하고, 생성된 파일이 있다면 경로를 알려주세요.",
+        });
+        try {
+          const summaryResponse = await client.chat(messages); // No tools
+          finalContent = summaryResponse.content;
+        } catch {
+          finalContent = toolCallResults
+            .map((tc) => `- ${tc.tool}(${Object.values(tc.args)[0] || ""}): ${tc.result.success ? "✓" : "✗"}`)
+            .join("\n");
+          finalContent = `수행된 작업:\n${finalContent}`;
+        }
+        onEvent?.({ type: "content", content: finalContent });
+      }
       break;
     }
 
@@ -182,6 +199,15 @@ export async function processMessage(
 
     // Continue the conversation with tool results
     onEvent?.({ type: "content", content: response.content });
+  }
+
+  // 도구는 실행됐지만 최종 content가 비어있는 경우 → 요약 표시
+  if (!finalContent && toolCallResults.length > 0 && iterations < maxIterations) {
+    finalContent = toolCallResults
+      .map((tc) => `- ${tc.tool}(${Object.values(tc.args)[0] || ""}): ${tc.result.success ? "✓" : "✗"}`)
+      .join("\n");
+    finalContent = `수행된 작업:\n${finalContent}`;
+    onEvent?.({ type: "content", content: finalContent });
   }
 
   if (iterations >= maxIterations) {
@@ -275,9 +301,10 @@ export async function* streamProcessMessage(
   ];
 
   let iterations = 0;
-  const maxIterations = 10;
+  const maxIterations = 30;
   const recentSignatures: string[] = [];
   const completedToolCalls: Array<{ tool: string; args: Record<string, unknown>; success: boolean }> = [];
+  let contentYielded = false;
 
   while (iterations < maxIterations) {
     // Check if aborted
@@ -301,7 +328,6 @@ export async function* streamProcessMessage(
       }
       if (event.type === "content" && event.content) {
         fullContent += event.content;
-        // Don't yield content yet - wait to see if there are tool calls
       } else if (event.type === "tool_call" && event.toolCall) {
         pendingToolCalls.push(event.toolCall);
       } else if (event.type === "error") {
@@ -310,18 +336,48 @@ export async function* streamProcessMessage(
       }
     }
 
-    // Only yield content if NO tool calls (avoid hallucinated pre-tool text)
-    if (pendingToolCalls.length === 0 && fullContent) {
+    // content가 있으면 항상 yield (tool call 유무 무관)
+    if (fullContent) {
       yield { type: "content", content: fullContent };
-    } else if (pendingToolCalls.length > 0) {
-      // Clear content when tool calls exist
-      fullContent = "";
+      contentYielded = true;
     }
 
-    messages.push({ role: "assistant", content: fullContent, toolCalls: pendingToolCalls.length > 0 ? pendingToolCalls : undefined });
+    // message history에 content 항상 보존
+    messages.push({
+      role: "assistant",
+      content: fullContent,
+      toolCalls: pendingToolCalls.length > 0 ? pendingToolCalls : undefined,
+    });
 
-    // If no tool calls, we're done
+    // If no tool calls, we're done — but check if final answer is empty
     if (pendingToolCalls.length === 0) {
+      // 도구를 실행했는데 최종 응답이 비어있으면 → LLM에게 요약 강제 요청
+      if (!fullContent && completedToolCalls.length > 0) {
+        let summaryYielded = false;
+        messages.push({
+          role: "user",
+          content: "도구 실행이 완료되었습니다. 결과를 요약하고, 생성된 파일이 있다면 경로를 알려주세요.",
+        });
+        try {
+          for await (const event of client.streamChat(messages, undefined, abortSignal)) {
+            if (abortSignal?.aborted) break;
+            if (event.type === "content" && event.content) {
+              yield { type: "content", content: event.content };
+              summaryYielded = true;
+              contentYielded = true;
+            }
+          }
+        } catch {
+          // API 에러 시 fallback
+        }
+        if (!summaryYielded) {
+          const toolSummary = completedToolCalls
+            .map((tc) => `- ${tc.tool}(${Object.values(tc.args)[0] || ""}): ${tc.success ? "✓" : "✗"}`)
+            .join("\n");
+          yield { type: "content", content: `수행된 작업:\n${toolSummary}` };
+          contentYielded = true;
+        }
+      }
       break;
     }
 
@@ -389,6 +445,14 @@ export async function* streamProcessMessage(
         toolCallId: toolCall.id,
       });
     }
+  }
+
+  // 도구는 실행됐지만 content가 한 번도 yield 안 된 경우 → 요약 표시
+  if (!contentYielded && completedToolCalls.length > 0 && iterations < maxIterations) {
+    const toolSummary = completedToolCalls
+      .map((tc) => `- ${tc.tool}(${Object.values(tc.args)[0] || ""}): ${tc.success ? "✓" : "✗"}`)
+      .join("\n");
+    yield { type: "content", content: `수행된 작업:\n${toolSummary}` };
   }
 
   // If maxIterations reached, force LLM to generate final answer
