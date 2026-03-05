@@ -24,14 +24,13 @@ export interface AgentResult {
 
 // Extract a unique signature from a tool call for loop detection
 function toolSignature(tc: ToolCall): string {
-  const args = tc.arguments;
-  // 주요 인자를 모두 포함하여 false positive 방지
-  // (같은 파일에 다른 패턴으로 grep하는 것은 반복이 아님)
-  const parts: string[] = [tc.name];
-  for (const key of ["filepath", "path", "pattern", "file", "directory", "query"]) {
-    if (args[key]) parts.push(`${key}=${String(args[key])}`);
-  }
-  return parts.join(":");
+  // 모든 인자를 포함하여 false positive 방지
+  // (같은 도구를 다른 profile/pattern/args으로 호출하는 것은 반복이 아님)
+  const sortedArgs = Object.keys(tc.arguments)
+    .sort()
+    .map((key) => `${key}=${String(tc.arguments[key])}`)
+    .join(",");
+  return `${tc.name}:${sortedArgs}`;
 }
 
 const BASE_SYSTEM_PROMPT = `You are ACTIVO, a code quality analyzer. You MUST call tools to perform tasks.
