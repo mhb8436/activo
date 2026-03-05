@@ -1,0 +1,181 @@
+{
+  "summary": {
+    "total_issues": 41,
+    "critical": 0,
+    "high": 0,
+    "medium": 41,
+    "low": 0,
+    "files_analyzed": 46,
+    "duration": "52.118667ms"
+  },
+  "profiles_used": [
+    "all"
+  ],
+  "issues": [
+    {
+      "rule_id": "quality-js-var",
+      "rule_name": "",
+      "severity": "medium",
+      "category": "style",
+      "file": "src/core/config.ts",
+      "line": 61,
+      "column": 0,
+      "message": "var 키워드 사용",
+      "suggestion": ""
+    },
+    {
+      "rule_id": "quality-js-console",
+      "rule_name": "",
+      "severity": "medium",
+      "category": "logging",
+      "file": "src/cli/headless.ts",
+      "line": 24,
+      "column": 0,
+      "message": "console.log 사용",
+      "suggestion": ""
+    },
+    {
+      "rule_id": "quality-js-console",
+      "rule_name": "",
+      "severity": "medium",
+      "category": "logging",
+      "file": "src/cli/headless.ts",
+      "line": 25,
+      "column": 0,
+      "message": "console.log 사용",
+      "suggestion": ""
+    },
+    {
+      "rule_id": "quality-js-console",
+      "rule_name": "",
+      "severity": "medium",
+      "category": "logging",
+      "file": "src/cli/headless.ts",
+      "line": 38,
+      "column": 0,
+      "message": "console.log 사용",
+      "suggestion": ""
+    },
+    {
+      "rule_id": "quality-js-console",
+      "rule_name": "",
+      "severity": "medium",
+      "category": "logging",
+      "file": "src/cli/headless.ts",
+      "line": 39,
+      "column": 0,
+      "message": "console.log 사용",
+      "suggestion": ""
+    },
+    {
+      "rule_id": "quality-js-console",
+      "rule_name": "",
+      "severity": "medium",
+      "category": "logging",
+      "file": "src/cli/headless.ts",
+      "line": 41,
+      "column": 0,
+      "message": "console.log 사용",
+      "suggestion": ""
+    },
+    {
+      "rule_id": "quality-js-console",
+      "rule_name": "",
+      "severity": "medium",
+      "category": "logging",
+      "file": "src/cli/headless.ts",
+      "line": 42,
+      "column": 0,
+      "message": "console.log 사용",
+      "suggestion": ""
+    },
+    {
+      "rule_id": "quality-js-console",
+      "rule_name": "",
+      "severity": "medium",
+      "category": "logging",
+      "file": "src/cli/headless.ts",
+      "line": 64,
+      "column": 0,
+      "message": "console.log 사용",
+      "suggestion": ""
+    },
+    {
+      "rule_id": "quality-js-console",
+      "rule_name": "",
+      "severity": "medium",
+      "category": "logging",
+      "file": "src/cli/headless.ts",
+      "line": 70,
+      "column": 0,
+      "message": "console.log 사용",
+      "suggestion": ""
+    },
+    {
+      "rule_id": "quality-js-console",
+      "rule_name": "",
+      "severity": "medium",
+      "category": "logging",
+      "file": "src/cli/headless.ts",
+      "line": 80,
+      "column": 0,
+      "message": "console.log 사용",
+      "suggestion": ""
+    },
+    {
+      "rule_id": "quality-js-console",
+      "rule_name": "",
+      "severity": "medium",
+      "category": "logging",
+      "file": "src/cli/banner.ts",
+      "line": 21,
+      "column": 0,
+      "message": "console.log 사용",
+      "suggestion": ""
+    },
+    {
+      "rule_id": "quality-js-console",
+      "rule_name": "",
+      "severity": "medium",
+      "category": "logging",
+      "file": "src/cli/banner.ts",
+      "line": 22,
+      "column": 0,
+      "message": "console.log 사용",
+      "suggestion": ""
+    },
+    {
+      "rule_id": "quality-js-console",
+      "rule_name": "",
+      "severity": "medium",
+      "category": "logging",
+      "file": "src/cli/banner.ts",
+      "line": 23,
+      "column": 0,
+      "message": "console.log 사용",
+      "suggestion": ""
+    },
+    {
+      "rule_id": "quality-js-console",
+      "rule_name": "",
+      "severity": "medium",
+      "category": "logging",
+      "file": "src/cli/banner.ts",
+      "line": 24,
+      "column": 0,
+      "message": "console.log 사용",
+      "suggestion": ""
+    },
+    {
+      "rule_id": "quality-js-console",
+      "rule_name": "",
+      "severity": "medium",
+      "category": "logging",
+      "file": "src/cli/banner.ts",
+      "line": 25,
+      "column": 0,
+      "message": "console.log 사용",
+      "suggestion": ""
+    }
+  ]
+}

@@ -19,6 +19,7 @@ import { ruleGenTools } from "./ruleGen.js";
 import { explainIssueTools } from "./explainIssue.js";
 import { analyzePatternsTools } from "./analyzePatterns.js";
 import { generateReportTools } from "./generateReport.js";
+import { generateImprovementTools } from "./generateImprovements.js";
 import { recommendProfileTools } from "./recommendProfile.js";
 import { getMCPManager } from "../mcp/client.js";
 import { INTENT_PATTERNS } from "../intentRouter.js";
@@ -45,11 +46,12 @@ export * from "./apexPaths.js";
 export * from "./explainIssue.js";
 export * from "./analyzePatterns.js";
 export * from "./generateReport.js";
+export * from "./generateImprovements.js";
 export * from "./recommendProfile.js";
 
 // All available tools (local + MCP)
 export function getAllTools(): Tool[] {
-  const localTools = [...builtInTools, ...standardsTools, ...cacheTools, ...astTools, ...embeddingTools, ...memoryTools, ...javaTools, ...frontendTools, ...sqlTools, ...mybatisTools, ...cssTools, ...htmlTools, ...dependencyTools, ...openapiTools, ...pythonTools, ...analyzeAllTools, ...ruleGenTools, ...explainIssueTools, ...analyzePatternsTools, ...generateReportTools, ...recommendProfileTools];
+  const localTools = [...builtInTools, ...standardsTools, ...cacheTools, ...astTools, ...embeddingTools, ...memoryTools, ...javaTools, ...frontendTools, ...sqlTools, ...mybatisTools, ...cssTools, ...htmlTools, ...dependencyTools, ...openapiTools, ...pythonTools, ...analyzeAllTools, ...ruleGenTools, ...explainIssueTools, ...analyzePatternsTools, ...generateReportTools, ...generateImprovementTools, ...recommendProfileTools];
   const mcpTools = getMCPManager().getAllTools();
   return [...localTools, ...mcpTools];
 }
@@ -115,7 +117,7 @@ const TOOL_CATEGORIES: Record<string, string[]> = {
   embeddings: ["index_codebase", "semantic_search", "find_similar_code", "embeddings_status", "clear_embeddings"],
   memory: ["init_project_memory", "add_key_file", "add_note", "add_fact", "save_conversation", "get_project_context", "search_memory", "clear_memory"],
   file_write: ["write_file", "run_command"],
-  apex: ["mcp_apex_analyze_code", "mcp_apex_list_profiles", "mcp_apex_get_issues", "explain_issue", "analyze_patterns", "generate_report", "recommend_profile"],
+  apex: ["mcp_apex_analyze_code", "mcp_apex_list_profiles", "mcp_apex_get_issues", "explain_issue", "analyze_patterns", "generate_report", "generate_improvement_report", "recommend_profile"],
   ruleGen: ["generate_apex_rules"],
 };
 

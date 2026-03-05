@@ -58,6 +58,50 @@ export const INTENT_PATTERNS: IntentPattern[] = [
     tool: "analyze_patterns",
     buildArgs: (path: string) => ({ report: path }),
   },
+  // Generate improvement report (must come before generate_report)
+  {
+    keywords: ["개선", "코드개선", "개선보고서", "개선 보고서", "improvement", "fix report", "감리", "before after"],
+    tool: "generate_improvement_report",
+    buildArgs: (path: string, message: string) => {
+      // Check for Excel paste: tab-separated text with rule_id pattern
+      if (message.includes("\t") && /[a-zA-Z]+-[a-zA-Z]+-\w+/.test(message)) {
+        // Extract paste text: everything after the first keyword match
+        const keywords = ["개선", "코드개선", "개선보고서", "improvement", "fix report", "감리", "before after", "이거"];
+        let pasteText = message;
+        for (const kw of keywords) {
+          const idx = message.toLowerCase().indexOf(kw);
+          if (idx >= 0) {
+            // Find the first line with a tab after the keyword
+            const afterKeyword = message.slice(idx + kw.length).trim();
+            const firstTabLine = afterKeyword.split("\n").findIndex((l) => l.includes("\t"));
+            if (firstTabLine >= 0) {
+              pasteText = afterKeyword.split("\n").slice(firstTabLine).join("\n");
+              break;
+            }
+          }
+        }
+        return { report: pasteText };
+      }
+
+      const allPaths = extractPaths(message);
+      let reportPath = "";
+      let outputDir = ".";
+
+      for (const p of allPaths) {
+        try {
+          const stat = fs.statSync(p);
+          if (stat.isFile()) {
+            if (!reportPath) reportPath = p;
+          } else if (stat.isDirectory()) {
+            outputDir = p;
+          }
+        } catch { /* skip */ }
+      }
+
+      if (!reportPath) reportPath = path;
+      return { report: reportPath, output_dir: outputDir };
+    },
+  },
   // Generate report (must come before APEX analysis)
   {
     keywords: ["리포트", "report", "보고서", "품질보고서"],
@@ -330,6 +374,18 @@ export async function detectAndExecuteIntent(
   // Pipeline intent: PDF → 규칙 생성 (no explicit path needed)
   if (isPdfToRulesIntent(msg)) {
     return await executePdfToRulesPipeline(userMessage, onEvent);
+  }
+
+  // Excel paste detection: tab-separated text with rule_id pattern (no file path needed)
+  if (paths.length === 0 && userMessage.includes("\t") && /[a-zA-Z]+-[a-zA-Z]+-\w+/.test(userMessage)) {
+    const improvementKeywords = ["개선", "코드개선", "개선보고서", "improvement", "fix report", "감리", "before after"];
+    if (improvementKeywords.some((kw) => msg.includes(kw)) && getTool("generate_improvement_report")) {
+      const pattern = INTENT_PATTERNS.find((p) => p.tool === "generate_improvement_report");
+      if (pattern) {
+        const args = pattern.buildArgs("", userMessage);
+        return await executeIntentTool("generate_improvement_report", args, onEvent);
+      }
+    }
   }
 
   // No path found → can't auto-route
