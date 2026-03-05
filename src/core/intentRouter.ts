@@ -269,21 +269,40 @@ export const FILE_TOOL_MAP: Record<string, string> = {
 // ─── Path Extraction ───
 
 /**
+ * Expand ~ to home directory in a path string.
+ */
+function expandHome(p: string): string {
+  if (p.startsWith("~/") || p === "~") {
+    const home = process.env.HOME || process.env.USERPROFILE || "";
+    return home + p.slice(1);
+  }
+  return p;
+}
+
+/**
  * Extract filesystem paths from user message.
- * Handles quoted paths (with spaces), simple paths, and greedy path expansion.
+ * Handles quoted paths (with spaces), simple paths, tilde (~) paths, and greedy path expansion.
  */
 export function extractPaths(message: string): string[] {
   const paths: string[] = [];
 
   // 1. Quoted paths: '...' or "..."
-  const quotedMatches = message.match(/['"]([/\\][^'"]+)['"]/g);
+  const quotedMatches = message.match(/['"]([~/\\][^'"]+)['"]/g);
   if (quotedMatches) {
     for (const m of quotedMatches) {
-      paths.push(m.slice(1, -1)); // strip quotes
+      paths.push(expandHome(m.slice(1, -1))); // strip quotes + expand ~
     }
   }
 
-  // 2. Simple paths (no spaces) - Unix & Windows
+  // 2. Tilde paths: ~/... (before simple path matching)
+  const tildeMatches = message.match(/(?:^|\s)(~\/[^\s,;:'"]+)/g);
+  if (tildeMatches) {
+    for (const m of tildeMatches) {
+      paths.push(expandHome(m.trim()));
+    }
+  }
+
+  // 3. Simple paths (no spaces) - Unix & Windows
   const unixMatches = message.match(/(?:^|\s)(\/[^\s,;:'"]+)/g);
   if (unixMatches) {
     for (const m of unixMatches) {
@@ -297,18 +316,16 @@ export function extractPaths(message: string): string[] {
     }
   }
 
-  // 3. Greedy path expansion: if simple match doesn't exist,
+  // 4. Greedy path expansion: if simple match doesn't exist,
   //    try extending with subsequent words until path is valid
   if (paths.length === 0 || !paths.some((p) => { try { return fs.existsSync(p); } catch { return false; } })) {
     const words = message.split(/\s+/);
     for (let i = 0; i < words.length; i++) {
-      if (words[i].startsWith("/") || /^[A-Z]:\\/i.test(words[i])) {
-        // Found a path start, try extending
-        let candidate = words[i];
+      const word = expandHome(words[i]);
+      if (word.startsWith("/") || word.startsWith("~/") || /^[A-Z]:\\/i.test(word)) {
+        let candidate = word;
         let bestPath = "";
-        // Check initial segment
         try { if (fs.existsSync(candidate)) bestPath = candidate; } catch { /* */ }
-        // Extend with subsequent words
         for (let j = i + 1; j < words.length; j++) {
           const extended = candidate + " " + words[j];
           try {
@@ -316,7 +333,6 @@ export function extractPaths(message: string): string[] {
               bestPath = extended;
               candidate = extended;
             } else {
-              // No more valid extensions - stop
               break;
             }
           } catch {
@@ -737,10 +753,13 @@ async function executeFullReportPipeline(
     return { handled: false };
   }
 
-  const targetPath = paths[0];
-  const outputDir = paths.find((p) => {
-    try { return fs.statSync(p).isDirectory() && p !== targetPath; } catch { return false; }
-  }) || ".";
+  // 분석 대상: 첫 번째 존재하는 디렉토리 (소스코드 경로)
+  // 출력 디렉토리: 두 번째 존재하는 디렉토리 (없으면 CWD)
+  const existingDirs = paths.filter((p) => {
+    try { return fs.statSync(p).isDirectory(); } catch { return false; }
+  });
+  const targetPath = existingDirs[0] || paths[0];
+  const outputDir = existingDirs[1] || ".";
 
   const allSteps: string[] = [];
   let analysisJson = "";
