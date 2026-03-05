@@ -102,6 +102,17 @@ export const INTENT_PATTERNS: IntentPattern[] = [
       return { report: reportPath, output_dir: outputDir };
     },
   },
+  // Excel export (must come before generate_report)
+  {
+    keywords: ["엑셀", "excel", "xlsx", "엑셀출력", "엑셀보고서"],
+    tool: "mcp_apex_export_excel",
+    buildArgs: (_path: string, message: string) => {
+      // Extract output file path from message if present
+      const allPaths = extractPaths(message);
+      const outputFile = allPaths.find((p) => p.endsWith(".xlsx") || p.endsWith(".xls")) || "apex-report.xlsx";
+      return { output_file: outputFile };
+    },
+  },
   // Generate report (must come before APEX analysis)
   {
     keywords: ["리포트", "report", "보고서", "품질보고서"],
@@ -374,6 +385,11 @@ export async function detectAndExecuteIntent(
   // Pipeline intent: PDF → 규칙 생성 (no explicit path needed)
   if (isPdfToRulesIntent(msg)) {
     return await executePdfToRulesPipeline(userMessage, onEvent);
+  }
+
+  // Pipeline intent: 전체 보고서 (분석 + Excel + Markdown + 개선보고서)
+  if (isFullReportIntent(msg)) {
+    return await executeFullReportPipeline(userMessage, onEvent);
   }
 
   // Excel paste detection: tab-separated text with rule_id pattern (no file path needed)
@@ -694,5 +710,134 @@ async function executePdfToRulesPipeline(
     toolArgs: ruleArgs,
     toolResult: ruleResult,
     summaryPrompt: `PDF 개발표준을 분석하여 YAML 규칙을 생성했습니다.\n\n처리된 PDF: ${pdfFiles.map(f => path.basename(f)).join(", ")}\n\n생성 결과:\n${compressed}\n\n사용자에게 한국어로 생성된 규칙의 내용과 수량을 요약해주세요. 생성된 규칙 파일 경로도 안내해주세요.`,
+  };
+}
+
+/**
+ * Detect if the message is a "전체 보고서" workflow intent.
+ * 키워드: 전체보고서, 종합보고서, 전체리포트, full report, complete report
+ */
+function isFullReportIntent(msg: string): boolean {
+  return /전체\s*보고서|종합\s*보고서|전체\s*리포트|full\s*report|complete\s*report/.test(msg);
+}
+
+/**
+ * Execute the Full Report pipeline:
+ *  1. mcp_apex_analyze_code (all profiles)
+ *  2. mcp_apex_export_excel → .xlsx
+ *  3. generate_report → .md
+ *  4. generate_improvement_report → 개선코드 .md
+ */
+async function executeFullReportPipeline(
+  userMessage: string,
+  onEvent?: (event: AgentEvent) => void
+): Promise<IntentResult> {
+  const paths = extractPaths(userMessage);
+  if (paths.length === 0) {
+    return { handled: false };
+  }
+
+  const targetPath = paths[0];
+  const outputDir = paths.find((p) => {
+    try { return fs.statSync(p).isDirectory() && p !== targetPath; } catch { return false; }
+  }) || ".";
+
+  const allSteps: string[] = [];
+  let analysisJson = "";
+  let excelPath = "";
+  let mdPath = "";
+  let improvementPath = "";
+
+  // Step 1: apex 분석
+  const analyzeArgs = { path: targetPath, profile: "all", max_issues: 100 };
+  onEvent?.({ type: "tool_use", tool: "mcp_apex_analyze_code", status: "start", args: analyzeArgs });
+  const analyzeCall: ToolCall = {
+    id: `fullreport_analyze_${Date.now()}`,
+    name: "mcp_apex_analyze_code",
+    arguments: analyzeArgs,
+  };
+  const analyzeResult = await executeTool(analyzeCall);
+  onEvent?.({ type: "tool_result", tool: "mcp_apex_analyze_code", status: analyzeResult.success ? "complete" : "error", result: analyzeResult });
+
+  if (!analyzeResult.success) {
+    return {
+      handled: true,
+      toolName: "mcp_apex_analyze_code",
+      toolArgs: analyzeArgs,
+      toolResult: analyzeResult,
+      summaryPrompt: `분석 중 오류가 발생했습니다: ${analyzeResult.error}\n사용자에게 오류를 설명해주세요.`,
+    };
+  }
+  analysisJson = analyzeResult.content;
+  allSteps.push("✓ 코드 분석 완료");
+
+  // Step 2: Excel 출력
+  const now = new Date();
+  const pad = (n: number) => n.toString().padStart(2, "0");
+  const timestamp = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}_${pad(now.getHours())}-${pad(now.getMinutes())}`;
+  fs.mkdirSync(outputDir, { recursive: true });
+
+  const xlsxFile = path.join(outputDir, `${timestamp}.xlsx`);
+  const excelArgs = { output_file: xlsxFile };
+  onEvent?.({ type: "tool_use", tool: "mcp_apex_export_excel", status: "start", args: excelArgs });
+  const excelCall: ToolCall = {
+    id: `fullreport_excel_${Date.now()}`,
+    name: "mcp_apex_export_excel",
+    arguments: excelArgs,
+  };
+  const excelResult = await executeTool(excelCall);
+  onEvent?.({ type: "tool_result", tool: "mcp_apex_export_excel", status: excelResult.success ? "complete" : "error", result: excelResult });
+
+  if (excelResult.success) {
+    try { excelPath = JSON.parse(excelResult.content).output_file || xlsxFile; } catch { excelPath = xlsxFile; }
+    allSteps.push(`✓ Excel 생성: ${excelPath}`);
+  } else {
+    allSteps.push(`⚠ Excel 생성 실패: ${excelResult.error}`);
+  }
+
+  // Step 3: Markdown 보고서
+  const reportArgs = { report: analysisJson, output_dir: outputDir, with_excel: false };
+  onEvent?.({ type: "tool_use", tool: "generate_report", status: "start", args: reportArgs });
+  const reportCall: ToolCall = {
+    id: `fullreport_md_${Date.now()}`,
+    name: "generate_report",
+    arguments: reportArgs,
+  };
+  const reportResult = await executeTool(reportCall);
+  onEvent?.({ type: "tool_result", tool: "generate_report", status: reportResult.success ? "complete" : "error", result: reportResult });
+
+  if (reportResult.success) {
+    try { mdPath = JSON.parse(reportResult.content).report_path || ""; } catch { /* skip */ }
+    allSteps.push(`✓ 보고서 생성: ${mdPath}`);
+  } else {
+    allSteps.push(`⚠ 보고서 생성 실패: ${reportResult.error}`);
+  }
+
+  // Step 4: 개선 보고서
+  const improvArgs = { report: analysisJson, output_dir: outputDir };
+  onEvent?.({ type: "tool_use", tool: "generate_improvement_report", status: "start", args: improvArgs });
+  const improvCall: ToolCall = {
+    id: `fullreport_improv_${Date.now()}`,
+    name: "generate_improvement_report",
+    arguments: improvArgs,
+  };
+  const improvResult = await executeTool(improvCall);
+  onEvent?.({ type: "tool_result", tool: "generate_improvement_report", status: improvResult.success ? "complete" : "error", result: improvResult });
+
+  if (improvResult.success) {
+    try { improvementPath = JSON.parse(improvResult.content).report_path || ""; } catch { /* skip */ }
+    allSteps.push(`✓ 개선 보고서 생성: ${improvementPath}`);
+  } else {
+    allSteps.push(`⚠ 개선 보고서 생성 실패: ${improvResult.error}`);
+  }
+
+  const summaryData = compressAnalysisResult(analysisJson, 3000);
+
+  return {
+    handled: true,
+    toolName: "generate_report",
+    toolArgs: reportArgs,
+    toolResult: reportResult,
+    summaryPrompt: `전체 보고서 파이프라인이 완료되었습니다.\n\n진행 결과:\n${allSteps.join("\n")}\n\n분석 요약:\n${summaryData}\n\n사용자에게 한국어로 다음을 안내해주세요:\n1. 생성된 파일 목록과 경로 (Excel: ${excelPath}, 보고서: ${mdPath}, 개선보고서: ${improvementPath})\n2. 주요 이슈 통계 요약\n3. 우선 조치 권장사항`,
   };
 }

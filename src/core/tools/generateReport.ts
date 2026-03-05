@@ -2,6 +2,7 @@ import fs from "fs";
 import path from "path";
 import { Tool, ToolResult } from "./types.js";
 import { loadApexReport, ApexReport, ApexIssue, createLLMClient } from "./apexUtils.js";
+import { getMCPManager } from "../mcp/client.js";
 
 // ─── Markdown Generation ───
 
@@ -261,11 +262,29 @@ async function generateMarkdownReport(report: ApexReport, title?: string): Promi
   return md;
 }
 
+// ─── Excel Export via apex MCP ───
+
+async function exportExcelViaApexMCP(outputFile: string): Promise<string | null> {
+  try {
+    const mcpManager = getMCPManager();
+    const apexConn = mcpManager.getConnection("apex");
+    if (!apexConn) return null;
+
+    const result = await mcpManager.callTool("apex", "export_excel", { output_file: outputFile });
+    if (!result.success) return null;
+
+    const parsed = JSON.parse(result.content);
+    return parsed.output_file || null;
+  } catch {
+    return null;
+  }
+}
+
 // ─── Tool Definition ───
 
 const generateReportTool: Tool = {
   name: "generate_report",
-  description: "apex 분석 결과(JSON)에서 마크다운 품질 리포트를 생성합니다. 요약, 핫스팟, 카테고리 분석, 주요 이슈, 권장사항을 포함합니다. Use when user asks: '리포트', 'report', '보고서', '품질보고서', 'generate report'.",
+  description: "apex 분석 결과(JSON)에서 마크다운 품질 리포트를 생성합니다. 요약, 핫스팟, 카테고리 분석, 주요 이슈, 권장사항을 포함합니다. Excel(.xlsx) 파일도 자동 생성됩니다. Use when user asks: '리포트', 'report', '보고서', '품질보고서', 'generate report'.",
   parameters: {
     type: "object",
     required: ["report"],
@@ -282,6 +301,10 @@ const generateReportTool: Tool = {
         type: "string",
         description: "출력 디렉토리 (기본: 현재 디렉토리)",
       },
+      with_excel: {
+        type: "boolean",
+        description: "Excel(.xlsx) 파일 생성 여부 (기본: true, apex MCP 연결 시 자동 생성)",
+      },
     },
   },
   handler: async (args): Promise<ToolResult> => {
@@ -289,6 +312,7 @@ const generateReportTool: Tool = {
       const reportArg = args.report as string;
       const title = (args.title as string) || undefined;
       const outputDir = (args.output_dir as string) || ".";
+      const withExcel = (args.with_excel as boolean) !== false; // 기본 true
 
       const report = loadApexReport(reportArg);
 
@@ -306,10 +330,18 @@ const generateReportTool: Tool = {
       fs.writeFileSync(mdPath, markdown, "utf-8");
       fs.writeFileSync(dataPath, JSON.stringify(report, null, 2), "utf-8");
 
+      // Excel export via apex MCP (analyze_code 결과가 메모리에 있으면 즉시 생성)
+      let excelPath: string | null = null;
+      if (withExcel) {
+        const xlsxPath = path.join(outputDir, `${timestamp}.xlsx`);
+        excelPath = await exportExcelViaApexMCP(xlsxPath);
+      }
+
       return {
         success: true,
         content: JSON.stringify({
           report_path: mdPath,
+          excel_path: excelPath,
           data_path: dataPath,
           total_issues: report.summary.total_issues,
           severity: {
@@ -319,7 +351,9 @@ const generateReportTool: Tool = {
             low: report.summary.low,
           },
           profiles_used: report.profiles_used,
-          message: `리포트가 생성되었습니다: ${mdPath}`,
+          message: excelPath
+            ? `리포트가 생성되었습니다: ${mdPath}\nExcel: ${excelPath}`
+            : `리포트가 생성되었습니다: ${mdPath} (Excel: apex MCP 미연결로 생략)`,
         }, null, 2),
       };
     } catch (error) {

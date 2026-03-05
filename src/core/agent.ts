@@ -45,7 +45,9 @@ const BASE_SYSTEM_PROMPT = `You are ACTIVO, a code quality analyzer. You MUST ca
 ## WORKFLOWS
 - PDF→규칙: import_pdf_standards → generate_apex_rules (do NOT read_file individually)
 - 코드분석: recommend_profile → mcp_apex_analyze_code → analyze_patterns
-- 리포트: mcp_apex_analyze_code → generate_report`;
+- 리포트: mcp_apex_analyze_code → generate_report (Excel 자동 포함)
+- 엑셀출력: mcp_apex_analyze_code → mcp_apex_export_excel (analyze_code 후 즉시 엑셀 생성 가능)
+- 전체보고서: mcp_apex_analyze_code → generate_report → generate_improvement_report`;
 
 // System prompt for summary-only mode (no tool calling)
 const SUMMARY_SYSTEM_PROMPT = `You are ACTIVO, a code quality analyzer.
