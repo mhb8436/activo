@@ -119,26 +119,212 @@ activo --resume
 }
 ```
 
+## APEX 정적분석 연동
+
+[APEX](https://github.com/mhb8436/apex-ai)는 400+ 규칙의 정적분석 엔진입니다. ACTIVO와 MCP로 연동하면 자연어로 코드 품질 점검·Excel 보고서·개선코드 생성을 한 번에 처리할 수 있습니다.
+
+### 연동 기능
+
+| 기능 | 명령 예시 |
+|------|----------|
+| 코드 품질 분석 | `src 폴더 품질검사 해줘` |
+| Excel 점검 내역 출력 | `엑셀로 출력해줘` |
+| 경영진 보고서 | `보고서 만들어줘` |
+| 개선코드 보고서 (대표사례) | `개선보고서 만들어줘` |
+| 개선코드 보고서 (전체 이슈) | `전체 개선보고서 만들어줘` |
+| 전체 보고서 자동화 | `전체보고서 /path/to/src /output` |
+
+### APEX MCP 설정
+
+#### 1. APEX 빌드
+
+```bash
+git clone https://github.com/mhb8436/apex-ai
+cd apex-ai
+make mcp        # MCP 서버 빌드 → build/apex-mcp
+```
+
+#### 2. activo 설정 (`~/.activo/config.json`)
+
+```json
+{
+  "ollama": {
+    "baseUrl": "http://localhost:11434",
+    "model": "mistral:latest"
+  },
+  "mcp": {
+    "servers": {
+      "apex": {
+        "command": "/path/to/apex-ai/build/apex-mcp",
+        "args": [],
+        "env": {
+          "APEX_CONFIG_DIR": "/path/to/apex-ai"
+        }
+      }
+    }
+  }
+}
+```
+
+#### 3. 연동 확인
+
+```bash
+activo
+# [MCP] Connected: apex  ← 이 메시지가 나오면 성공
+```
+
+### 전체 보고서 파이프라인
+
+`전체보고서` 키워드 하나로 4단계 자동 실행:
+
+```
+전체보고서 /path/to/src /path/to/output
+```
+
+```
+1. mcp_apex_analyze_code   → 400+ 규칙 정적분석
+2. mcp_apex_export_excel   → 전체 이슈 Excel 저장 (4시트)
+3. generate_report         → 경영진용 Markdown 보고서 (AI 분석 포함)
+4. generate_improvement_report → 문제코드/개선코드 Markdown 보고서
+```
+
+**출력물:**
+```
+output/
+├── 2024-01-15_14-30.xlsx              # 고객 납품용 점검 내역 (필터/정렬 가능)
+├── 2024-01-15_14-30.md               # 경영진 보고서 (AI 요약 포함)
+├── improvement_2024-01-15_14-31.md   # 개선코드 보고서 (대표사례)
+└── data/2024-01-15_14-30.json        # 원본 분석 데이터
+```
+
+### 개선코드 보고서 옵션
+
+```bash
+# 대표사례 모드 (기본, 빠름) - rule_id당 1개 사례
+activo "개선보고서 /path/to/report.json"
+
+# 전체 모드 - 모든 이슈 파일별 배치 처리
+activo "전체 개선보고서 /path/to/report.json"
+
+# 심각도 필터 (critical만)
+# → generate_improvement_report mode=full min_severity=critical
+```
+
+### 폐쇄망(망분리) 환경 설치
+
+인터넷이 차단된 환경에서 ACTIVO + APEX를 사용하는 방법입니다.
+
+#### 준비 (인터넷 연결 환경)
+
+```bash
+# 1. activo 패키지 생성
+cd activo
+npm pack
+# → activo-0.4.4.tgz 생성
+
+# 2. apex MCP 바이너리 빌드
+cd apex-ai
+make mcp
+# → build/apex-mcp, build/configs/ 생성
+
+# 3. Ollama 모델 파일 준비
+# Ollama 모델은 ~/.ollama/models/ 에 저장됨
+# 해당 디렉토리를 통째로 복사하거나 모델 파일(.gguf)을 별도 내보내기
+```
+
+#### 폐쇄망으로 복사할 파일 목록
+
+```
+배포 패키지/
+├── activo-0.4.4.tgz          # activo npm 패키지
+├── apex-mcp                  # APEX MCP 서버 바이너리 (플랫폼별)
+├── apex-configs/             # APEX 규칙셋
+│   ├── profiles.yaml
+│   └── rulesets/
+└── ollama-models/            # Ollama 모델 파일 (선택)
+    └── mistral/              # 또는 qwen2.5:7b 등
+```
+
+#### 폐쇄망에서 설치
+
+```bash
+# Node.js는 사전 설치 필요 (nodejs.org에서 오프라인 설치 패키지 다운로드)
+
+# 1. activo 설치 (오프라인)
+npm install -g activo-0.4.4.tgz
+
+# 2. apex 바이너리 권한 설정 (Linux/macOS)
+chmod +x apex-mcp
+
+# 3. Ollama 설치 + 모델 로드
+# ollama.ai에서 설치 파일 다운로드 후 설치
+# 모델 파일을 ~/.ollama/models/ 에 복사하거나:
+ollama create mistral -f Modelfile   # GGUF에서 import
+
+# 4. activo 설정
+cat > ~/.activo/config.json << 'EOF'
+{
+  "ollama": {
+    "baseUrl": "http://localhost:11434",
+    "model": "mistral:latest"
+  },
+  "mcp": {
+    "servers": {
+      "apex": {
+        "command": "/opt/apex/apex-mcp",
+        "args": [],
+        "env": {
+          "APEX_CONFIG_DIR": "/opt/apex"
+        }
+      }
+    }
+  }
+}
+EOF
+
+# 5. 실행 확인
+activo
+```
+
+#### Anthropic API 대신 Ollama 사용
+
+폐쇄망에서는 Anthropic API 연결이 불가하므로 반드시 Ollama를 사용합니다:
+
+```json
+{
+  "provider": "ollama",
+  "ollama": {
+    "baseUrl": "http://localhost:11434",
+    "model": "qwen2.5-coder:7b"
+  }
+}
+```
+
+> 권장 모델: `qwen2.5-coder:7b` (코드 분석 특화, 8GB RAM) 또는 `mistral:latest` (범용)
+
+---
+
 ## 함께 사용하기
 
-activo는 단독으로도 품질 점검 도구로 충분합니다. 다만 **규칙 고정·배치 검사·Excel 리포트**가 필요한 경우 [Code Quality Checker (CQC)](https://github.com/mhb8436/code-quality-checker)와 함께 쓰면 효과적입니다.
+activo는 단독으로도 품질 점검 도구로 충분합니다. **APEX MCP 연동** 시 Excel 리포트·정밀 정적분석이 추가됩니다.
 
-| 용도 | activo | CQC |
-|------|--------|-----|
-| 대화형 분석·설명 | ◎ | - |
-| 개발표준 RAG 검사 | ◎ | - |
-| 고정 규칙 배치 검사 | - | ◎ |
+| 용도 | activo 단독 | activo + APEX |
+|------|------------|--------------|
+| 대화형 분석·설명 | ◎ | ◎ |
+| 개발표준 RAG 검사 | ◎ | ◎ |
+| 정밀 정적분석 (400+ 규칙) | - | ◎ |
 | Excel 제출용 리포트 | - | ◎ |
-| 오프라인 단일 바이너리 | - | ◎ |
-
-activo로 개발표준 PDF를 MD로 변환·RAG 인덱싱한 뒤 점검하고, CQC로 조직 룰셋을 YAML로 정의해 CI·감사에 사용하는 구성이 가능합니다.
+| 전체 이슈 개선코드 보고서 | - | ◎ |
+| 오프라인 단일 바이너리 | - | ◎ (APEX) |
 
 ## 기술 스택
 
-- **Ollama** - 로컬 LLM
+- **Ollama / Anthropic API** - 로컬 LLM 또는 클라우드 LLM
+- **APEX MCP** - 400+ 규칙 정적분석 엔진 (Go, ANTLR4)
 - **TypeScript Compiler API** - JS/TS AST 분석
 - **java-ast** - Java 파싱 (ANTLR4)
 - **React Ink** - 터미널 UI
+- **Model Context Protocol (MCP)** - 외부 도구 연동
 
 ## 라이선스
 
